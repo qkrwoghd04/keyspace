@@ -1,0 +1,84 @@
+button:disabled, select:disabled { cursor: not-allowed; opacity: .45; }
+select { font: inherit; color: inherit; }
+select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.challenge-slot { grid-row: 2; min-width: 0; }
+.challenge { width: min(780px, calc(100% - 72px)); margin: 12px auto 10px; color: var(--ink); }
+.challenge-topline, .challenge-setup, .challenge-setup fieldset, .duration-options, .challenge-effects { display: flex; align-items: center; }
+.challenge-topline { justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.challenge-eyebrow { color: var(--muted); font-size: 8px; letter-spacing: .17em; }
+.challenge-effects { gap: 8px; font-size: 10px; color: var(--muted); }
+.challenge select { min-height: 44px; padding: 0 19px 0 0; border: 0; background-color: transparent; color: var(--ink); max-width: 100%; }
+.challenge select option { background: var(--paper); }
+.challenge-setup { justify-content: space-between; gap: 20px; }
+.challenge-setup fieldset { min-width: 0; border: 0; margin: 0; padding: 0; gap: 20px; font-size: 12px; }
+.duration-options { gap: 5px; flex-shrink: 0; }
+.duration-options button { border: 0; background: none; min-height: 44px; padding: 0 9px; color: var(--muted); font-size: 11px; }
+.duration-options button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 7px; }
+.ghost-choice { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 10px; color: var(--muted); }
+.ghost-choice > span { white-space: nowrap; }
+.ghost-choice select { width: 180px; font-size: 10px; }
+.race-start, .race-cancel { flex-shrink: 0; min-height: 40px; min-width: 68px; padding: 0 15px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--control-active); font-size: 12px; }
+.race-cancel { background: none; color: var(--muted); }
+.race-metrics { display: flex; gap: clamp(18px, 3vw, 38px); align-items: baseline; padding: 13px 0 12px; border-top: 1px solid var(--line); margin-top: 8px; }
+.race-metrics > div { display: flex; align-items: baseline; gap: 9px; }
+.race-metrics span { font-size: 9px; color: var(--muted); }
+.race-metrics output { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.race-metrics small { font-size: 10px; color: var(--muted); }
+.race-passage { height: 3.4em; max-height: 3.4em; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; font-size: 23px; line-height: 1.7; letter-spacing: -.025em; white-space: pre-wrap; word-break: break-word; color: color-mix(in srgb, var(--ink) 68%, var(--paper)); }
+.race-passage--code { font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; font-size: 17px; letter-spacing: 0; }
+.prompt-correct { color: var(--accent); }
+.prompt-current { position: relative; background: var(--selection); color: var(--ink); border-bottom: 2px solid var(--accent); }
+.prompt-error { background: color-mix(in srgb, #b84435 22%, var(--paper)); border-color: #b84435; text-decoration: underline wavy #b84435; }
+#challenge-input { margin-top: 9px; padding: 9px 0; height: 43px; font-family: inherit; font-size: 16px; line-height: 1.4; letter-spacing: -.015em; text-align: left; border-bottom: 1px solid var(--line); }
+#challenge-input:focus { border-color: var(--accent); }
+.challenge-note { margin-top: 8px; min-height: 15px; font-size: 10px; color: var(--muted); line-height: 1.5; }
+.challenge--countdown .race-metrics > div:first-child output { color: var(--accent); }
+.challenge--canceled .challenge-note { color: var(--ink); }
+.challenge-details { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-top: 3px; font-size: 10px; color: var(--muted); }
+.challenge-details details { flex: 1; min-width: 0; }
+.challenge-details summary { cursor: pointer; min-height: 36px; padding-block: 10px; }
+.challenge-details p { font-size: 11px; line-height: 1.65; margin: 0 0 10px; }
+.browser-records > summary { text-align: right; list-style-position: inside; }
+.browser-records > summary span { margin-left: 6px; color: var(--accent); }
+.records-content { text-align: left; }
+.records-content ol { list-style: none; padding: 0; margin: 0; }
+.records-content li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-block: 5px; border-bottom: 1px solid var(--line); }
+.records-content small { display: block; margin-top: 5px; color: var(--subtle); font-size: 9px; }
+.records-content button, .storage-error button { min-height: 44px; padding: 0 3px; border: 0; color: var(--ink); background: none; text-decoration: underline; text-underline-offset: 4px; font-size: 11px; }
+.delete-confirm { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.storage-error { font-size: 11px; line-height: 1.6; color: var(--ink); border-top: 1px solid var(--line); padding-top: 7px; }
+.storage-error button { margin-left: 12px; }
+.race-result { padding: 9px 0 7px; }
+.race-result p { font: 27px/1.45 'Iowan Old Style', 'Palatino Linotype', Georgia, serif; margin: 0 0 8px; letter-spacing: -.045em; }
+.race-result > span { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; line-height: 1.5; }
+.ghost-again { margin-top: 9px; min-height: 44px; border: 0; padding: 0; background: none; color: var(--accent); font-size: 12px; }
+.ghost-again span { margin-left: 10px; }
+.ghost-race { margin-top: 12px; }
+.ghost-caption { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 7px; font-variant-numeric: tabular-nums; }
+.ghost-caption b { font-weight: 500; color: var(--ink); }
+.race-track { height: 3px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.race-track i { display: block; height: 100%; background: var(--accent); transform-origin: left center; }
+.race-track--ghost { height: 2px; opacity: .75; }
+.race-track--ghost i { background: var(--ink); }
+@media (max-width: 1250px) { .challenge { width: calc(100% - 64px); } .challenge-setup fieldset { gap: 12px; } .ghost-choice { gap: 5px; } .ghost-choice select { width: 140px; } }
+@media (max-width: 740px) {
+  .challenge { width: calc(100% - 44px); margin-top: 4px; }
+  .challenge-setup { align-items: flex-start; gap: 12px; }
+  .challenge-setup fieldset { flex-wrap: wrap; column-gap: 12px; row-gap: 0; }
+  .ghost-choice { width: 100%; }
+  .ghost-choice select { width: auto; flex: 1; }
+  .challenge-eyebrow { font-size: 7px; letter-spacing: .11em; }
+  .race-start, .race-cancel { margin-top: 2px; min-height: 44px; padding-inline: 11px; }
+  .race-metrics { justify-content: space-between; gap: 10px; margin-top: 4px; }
+  .race-metrics > div { display: flex; flex-direction: column; gap: 6px; }
+  .race-metrics output { font-size: 20px; }
+  .race-metrics small { font-size: 8px; }
+  .race-passage { font-size: 19px; }
+  .race-passage--code { font-size: 15px; }
+  .challenge-note { font-size: 9px; }
+  .challenge-details { gap: 12px; }
+  .challenge-details:has(details[open]) { flex-direction: column; }
+  .challenge-details details { width: 100%; }
+  .challenge-details:has(details[open]) .browser-records > summary { text-align: left; }
+  .race-result p { font-size: 24px; }
+}

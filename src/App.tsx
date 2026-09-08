@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import KeyboardScene from './components/KeyboardScene';
+import ThemeCollection, { CollectionIcon } from './components/ThemeCollection';
 import { KeyboardInput } from './input/KeyboardInput';
-import { KEY_BY_CODE } from './keyboard/layout';
-import { DEFAULT_PRESET, PRESETS } from './keyboard/presets';
+import { editVirtualKey } from './input/virtualEditing';
+import { ChallengeChannel } from './challenge/ChallengeChannel';
+import type { ChallengeHandle } from './challenge/Challenge';
+import { DEFAULT_THEME } from './themes/registry';
+import type { ThemeDefinition } from './themes/types';
+
+const Challenge = lazy(() => import('./challenge/Challenge'));
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -42,7 +48,17 @@ export default function App() {
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
   const [resetMessage, setResetMessage] = useState('');
-  const [preset, setPreset] = useState(DEFAULT_PRESET);
+  const [activeTheme, setActiveTheme] = useState(DEFAULT_THEME);
+  const [requestedTheme, setRequestedTheme] = useState(DEFAULT_THEME);
+  const [collapsed, setCollapsed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [themeError, setThemeError] = useState('');
+  const [mode, setMode] = useState<'playground' | 'challenge'>('playground');
+  const [raceLocked, setRaceLocked] = useState(false);
+  const [challengeChannel] = useState(() => new ChallengeChannel());
+  const [challengeLoaded, setChallengeLoaded] = useState(false);
+  const challenge = useRef<ChallengeHandle>(null);
+  const preset = activeTheme.appearance;
 
   const theme = {
     '--paper': preset.background,
@@ -54,10 +70,10 @@ export default function App() {
     '--control-surface': preset.ui.controlSurface,
     '--control-active': preset.ui.controlActive,
     '--accent': preset.accent,
-    '--swatch-housing': preset.housing.body.color,
-    '--swatch-keycap': preset.keycaps.ivory.top.color,
-    '--swatch-accent': preset.keycaps.orange.top.color,
-    colorScheme: preset.id === 'dark' || preset.id === 'neon' ? 'dark' : 'light',
+    '--swatch-housing': activeTheme.swatches[0],
+    '--swatch-keycap': activeTheme.swatches[1],
+    '--swatch-accent': activeTheme.swatches[2],
+    colorScheme: activeTheme.colorScheme,
   } as CSSProperties;
 
   useEffect(() => input.connect(), [input]);
@@ -86,33 +102,13 @@ export default function App() {
   }, []);
 
   const onVirtualKey = useCallback((code: string) => {
+    if (mode === 'challenge') { challenge.current?.virtualKey(code); return; }
     const textarea = editor.current;
     if (!textarea || composing.current) return;
-    const held = input.pressed;
-    if (['ControlLeft', 'ControlRight', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight'].some(key => held.has(key))) return;
-    const definition = KEY_BY_CODE.get(code);
-    const shifted = held.has('ShiftLeft') || held.has('ShiftRight');
-    let insertion = shifted ? definition?.shiftCharacter ?? definition?.character : definition?.character;
-    let start = textarea.selectionStart;
-    let end = textarea.selectionEnd;
-
-    if (code === 'Enter') insertion = '\n';
-    if (code === 'Backspace') {
-      insertion = '';
-      if (start === end && start > 0) start -= [...textarea.value.slice(0, start)].at(-1)!.length;
-    }
-    if (code === 'Delete') {
-      insertion = '';
-      if (start === end && end < textarea.value.length) end += String.fromCodePoint(textarea.value.codePointAt(end)!).length;
-    }
-    if (insertion === undefined) return;
-
-    // Virtual typing is explicit editing; physical typing stays entirely native.
-    // setRangeText keeps the current selection and never summons a mobile keyboard.
-    textarea.setRangeText(insertion, start, end, 'end');
+    if (!editVirtualKey(textarea, code, input.pressed)) return;
     setText(textarea.value);
     setResetMessage('');
-  }, [input]);
+  }, [input, mode]);
 
   const reset = () => {
     setText('');
@@ -120,38 +116,50 @@ export default function App() {
     setResetMessage('Text cleared.');
   };
 
+  const selectTheme = (next: ThemeDefinition) => {
+    if (challengeChannel.state.racing) return;
+    setThemeError('');
+    setRequestedTheme(next);
+    setSheetOpen(false);
+  };
+  const selectMode = (next: 'playground' | 'challenge') => {
+    if (challengeChannel.state.racing || mode === next) return;
+    input.releaseAll();
+    if (next === 'challenge') setChallengeLoaded(true);
+    challengeChannel.configure({ enabled: next === 'challenge' });
+    setMode(next);
+  };
+  const themeReady = useCallback((next: ThemeDefinition) => { setActiveTheme(next); setThemeError(''); }, []);
+  const themeFailed = useCallback((next: ThemeDefinition, error: unknown) => {
+    console.warn(`Could not load ${next.name}`, error);
+    setThemeError(`${next.name} could not load.`);
+  }, []);
+
   return (
-    <div className="keyspace" style={theme} data-preset={preset.id}>
+    <div className={`keyspace${collapsed ? ' keyspace--expanded' : ''}`} style={theme} data-preset={activeTheme.id} data-mode={mode}>
+      <ThemeCollection active={activeTheme} pending={themeError ? activeTheme : requestedTheme} collapsed={collapsed} sheetOpen={sheetOpen} onCollapse={() => setCollapsed(true)} onSheetClose={() => setSheetOpen(false)} onSelect={selectTheme} disabled={raceLocked} />
+      <div className="main-room">
       <header className="site-header">
         <div className="wordmark" aria-label="Keyspace">
           <KeyboardMark />
           <span>KEYSPACE<span className="wordmark-period">.</span></span>
         </div>
-        <div className="preset-selector" role="group" aria-label="Keyboard style">
-          {PRESETS.map(option => (
-            <button
-              type="button"
-              className="preset-button"
-              key={option.id}
-              aria-label={option.name}
-              aria-pressed={preset.id === option.id}
-              title={option.name}
-              onClick={() => setPreset(option)}
-            >
-              <span className="preset-indicator" aria-hidden="true" />
-              {option.shortName}
-            </button>
-          ))}
+        <div className="theme-toolbar" data-keyboard-controls>
+          <span className="current-object">{activeTheme.name}<span> / {activeTheme.material}</span></span>
+          <button type="button" className="control collection-open desktop-collection-open" hidden={!collapsed} onClick={() => setCollapsed(false)} aria-label="Open collection"><CollectionIcon /><span>Collection</span></button>
+          <button type="button" className="control mobile-collection-open" disabled={raceLocked} onClick={() => setSheetOpen(true)} aria-haspopup="dialog" aria-expanded={sheetOpen}><CollectionIcon /><span>{activeTheme.name}</span><span aria-hidden="true">⌄</span></button>
         </div>
       </header>
 
-      <main className="playground">
-        <h1 className="sr-only">An interactive mechanical keyboard</h1>
-        <section className={`thoughts${focused ? ' thoughts--focused' : ''}`} aria-label="Your typing space">
+      <main className={`playground${mode === 'challenge' ? ' playground--challenge' : ''}`}>
+        <h1 className="sr-only">An interactive keyboard collection</h1>
+        <nav className="mode-switch" aria-label="Typing mode" data-keyboard-controls><button type="button" aria-pressed={mode === 'playground'} disabled={raceLocked} onClick={() => selectMode('playground')}>Playground</button><button type="button" aria-pressed={mode === 'challenge'} disabled={raceLocked} onClick={() => selectMode('challenge')}>Challenge</button></nav>
+        <section className={`thoughts${focused ? ' thoughts--focused' : ''}`} aria-label="Your typing space" hidden={mode !== 'playground'}>
           <label className="editor-label" htmlFor="typing-space">A little room for your thoughts</label>
           <div className="editor-wrap">
             <textarea
               id="typing-space"
+              data-keyboard-input
               ref={editor}
               value={text}
               onChange={event => { setText(event.currentTarget.value); setResetMessage(''); }}
@@ -174,8 +182,13 @@ export default function App() {
           </label>
         </section>
 
+        {challengeLoaded ? <div className="challenge-slot" hidden={mode !== 'challenge'}><Suspense fallback={<p className="challenge-loading" role="status">Challenge 준비 중…</p>}><Challenge ref={challenge} input={input} channel={challengeChannel} enabled={mode === 'challenge'} themeReady={!themeError && activeTheme.id === requestedTheme.id} onLockChange={setRaceLocked} /></Suspense></div> : null}
+
         <div className="keyboard-stage">
-          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} preset={preset} />
+          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} theme={requestedTheme} onThemeReady={themeReady} onThemeError={themeFailed} challengeChannel={challengeChannel} />
+          <div className="theme-status" role="status" aria-live="polite" data-keyboard-controls>
+            {themeError ? <>{themeError}<button type="button" onClick={() => { setThemeError(''); setRequestedTheme({ ...requestedTheme }); }}>Try again</button></> : requestedTheme.id !== activeTheme.id ? `Preparing ${requestedTheme.name}…` : null}
+          </div>
         </div>
       </main>
 
@@ -185,18 +198,20 @@ export default function App() {
           <span>75% <span className="caption-slash">/</span> ANSI</span>
         </div>
         <p className="interaction-hint"><span className="desktop-hint">Type on your keyboard.</span><span className="mobile-hint">Make yourself at home.</span> Or try a key.</p>
-        <div className="controls" aria-label="Playground controls">
-          <button type="button" onClick={reset} className="control" aria-label="Reset typed text">
+        <div className="controls" aria-label="Playground controls" data-keyboard-controls>
+          <button type="button" onClick={reset} className="control" aria-label="Reset typed text" hidden={mode !== 'playground'}>
             <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7.2a6.2 6.2 0 1 1-.3 4.8M4.2 3.5v3.9h3.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
             Reset
           </button>
-          <span className="control-divider" aria-hidden="true" />
+          <span className="control-divider" aria-hidden="true" hidden={mode !== 'playground'} />
           <button type="button" onClick={() => input.setSoundEnabled(!snapshot.soundEnabled)} className="control sound-control" aria-pressed={snapshot.soundEnabled} aria-label={snapshot.soundEnabled ? 'Disable keyboard sound' : 'Enable keyboard sound'}>
             <SoundIcon enabled={snapshot.soundEnabled} />
             <span>Sound <span className="sound-state">{snapshot.soundEnabled ? 'on' : 'off'}</span></span>
           </button>
+          <label className="volume-control"><span className="sr-only">Master volume</span><input type="range" min="0" max="100" step="1" value={Math.round(snapshot.volume * 100)} onChange={event => input.setVolume(Number(event.currentTarget.value) / 100)} aria-label="Master volume" aria-valuetext={`${Math.round(snapshot.volume * 100)} percent`} /></label>
         </div>
       </footer>
+      </div>
       <span className="sr-only" role="status" aria-live="polite">{resetMessage}</span>
     </div>
   );

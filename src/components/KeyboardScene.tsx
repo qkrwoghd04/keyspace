@@ -1,28 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardInput } from '../input/KeyboardInput';
 import { Studio } from '../keyboard/Studio';
-import type { KeyboardPreset } from '../keyboard/presets';
+import type { ThemeDefinition } from '../themes/types';
+import type { ChallengeChannel } from '../challenge/ChallengeChannel';
 
 interface KeyboardSceneProps {
+  challengeChannel: ChallengeChannel;
   input: KeyboardInput;
   reducedMotion: boolean;
   onVirtualKey: (code: string) => void;
-  preset: KeyboardPreset;
+  theme: ThemeDefinition;
+  onThemeReady: (theme: ThemeDefinition) => void;
+  onThemeError: (theme: ThemeDefinition, error: unknown) => void;
 }
 
-export default function KeyboardScene({input, reducedMotion, onVirtualKey, preset}: KeyboardSceneProps) {
+export default function KeyboardScene({input, reducedMotion, onVirtualKey, theme, onThemeReady, onThemeError, challengeChannel}: KeyboardSceneProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const studio = useRef<Studio | null>(null);
   const virtualKey = useRef(onVirtualKey);
   const [unavailable, setUnavailable] = useState(false);
   virtualKey.current = onVirtualKey;
+  const callbacks = useRef({ onThemeReady, onThemeError });
+  callbacks.current = { onThemeReady, onThemeError };
 
   useEffect(() => {
     if (!canvas.current || unavailable) return;
     try {
       studio.current = new Studio(canvas.current, input, code => virtualKey.current(code), () => setUnavailable(true));
       studio.current.setReducedMotion(reducedMotion);
-      studio.current.setPreset(preset, true);
     } catch (error) {
       console.warn('The 3D keyboard could not start.', error);
       setUnavailable(true);
@@ -36,7 +41,21 @@ export default function KeyboardScene({input, reducedMotion, onVirtualKey, prese
   }, [input, unavailable]);
 
   useEffect(() => studio.current?.setReducedMotion(reducedMotion), [reducedMotion]);
-  useEffect(() => studio.current?.setPreset(preset), [preset]);
+  useEffect(() => studio.current?.connectChallenge(challengeChannel), [challengeChannel, unavailable]);
+  useEffect(() => {
+    let current = true;
+    if (unavailable) {
+      input.setSoundProfile(theme.id);
+      callbacks.current.onThemeReady(theme);
+      return;
+    }
+    void studio.current?.setTheme(theme).then(committed => {
+      if (committed && current) callbacks.current.onThemeReady(theme);
+    }).catch(error => {
+      if (current) callbacks.current.onThemeError(theme, error);
+    });
+    return () => { current = false; };
+  }, [theme, unavailable, input]);
 
   return (
     <div className={`keyboard-scene${unavailable ? ' keyboard-scene--unavailable' : ''}`}>

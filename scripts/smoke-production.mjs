@@ -1,0 +1,60 @@
+import { chromium, expect } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+
+const base = process.env.PREVIEW_URL || 'http://127.0.0.1:5182';
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/assets/orbit-*.js', route => route.abort());
+  await page.goto(base);
+  await expect(page.locator('canvas')).toBeVisible();
+  expect(await page.evaluate(() => typeof window.__keyspace)).toBe('undefined');
+  await page.locator('#typing-space').fill('Production preview. 한글');
+  await page.getByRole('button', { name: 'Orbit', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(page.locator('.keyspace')).toHaveAttribute('data-preset', 'studio');
+  await page.unroute('**/assets/orbit-*.js');
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.locator('.keyspace')).toHaveAttribute('data-preset', 'orbit');
+  const themes = await page.locator('.collection-sidebar [data-theme]').evaluateAll(buttons => buttons.map(button => ({ id: button.dataset.theme, name: button.getAttribute('aria-label') })));
+  for (const { name, id } of themes) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await expect(page.locator('.keyspace')).toHaveAttribute('data-preset', id);
+    await expect(page.locator('canvas')).toHaveCount(1);
+    await expect(page.locator('#typing-space')).toHaveValue('Production preview. 한글');
+  }
+  const thumbnails = await page.locator('.collection-sidebar img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0));
+  expect(thumbnails).toBe(true);
+  await page.getByRole('button', { name: 'Reset typed text' }).click();
+  await page.locator('#typing-space').focus();
+  await page.keyboard.type('Build verified.');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Ready');
+  await expect(page.locator('#typing-space')).toHaveValue('Build verified.\nReady');
+  await page.clock.install();
+  await page.getByRole('button', { name: 'Challenge', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Passage language' }).selectOption('english');
+  expect(await page.evaluate(() => typeof window.__challenge)).toBe('undefined');
+  await page.getByRole('button', { name: '시작', exact: true }).click();
+  await page.clock.runFor(3100); await page.keyboard.type('A quiet room');
+  await page.clock.fastForward(30000);
+  await expect(page.getByTestId('race-speed')).toHaveText('4.8');
+  await expect(page.getByTestId('race-accuracy')).toHaveText('100.0%');
+  await expect(page.getByRole('button', { name: '이 기록과 Ghost Race' })).toBeEnabled();
+  await page.getByRole('button', { name: '이 기록과 Ghost Race' }).click();
+  await expect(page.locator('#challenge-input')).toBeFocused();
+  await page.clock.runFor(3100); await page.keyboard.type('A');
+  await expect(page.locator('#challenge-input')).toHaveValue('A');
+  await expect(page.getByRole('progressbar', { name: 'Ghost progress', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '경기 취소', exact: true }).click();
+  await page.getByRole('button', { name: 'Playground', exact: true }).click();
+  await expect(page.locator('#typing-space')).toHaveValue('Build verified.\nReady');
+  expect(errors).toEqual([]);
+  await mkdir('artifacts/production', { recursive: true });
+  await page.screenshot({ path: 'artifacts/production/orbit.png' });
+  const report = { base, themes: themes.length, oneCanvas: true, debugApiAbsent: true, challengeDebugApiAbsent: true, challengeTimedResult: true, challengeSavedGhost: true, textRetained: true, nativeTyping: true, thumbnails, failedChunkRetry: true, errors };
+  await writeFile('artifacts/production/report.json', JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report));
+} finally { await browser.close(); }

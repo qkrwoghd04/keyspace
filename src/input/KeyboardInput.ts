@@ -1,23 +1,28 @@
 import { KEY_BY_CODE } from '../keyboard/layout';
 import { SwitchSound } from './SwitchSound';
+import type { ThemeId } from '../themes/types';
 
 export interface InputSnapshot {
   pressedCodes: readonly string[];
   lastCode: string | null;
   pressCount: number;
   soundEnabled: boolean;
+  volume: number;
 }
+
+export interface PressEvent { readonly code: string; readonly sequence: number }
 
 /** Physical key state is independent of the browser's text/IME editing pipeline. */
 export class KeyboardInput {
   private readonly down = new Set<string>();
   private readonly sources = new Map<string, Set<string>>();
   private readonly pressVersions = new Map<string, number>();
+  private readonly pressHistory: PressEvent[] = [];
   private resetGeneration = 0;
   private readonly listeners = new Set<() => void>();
   private readonly sound = new SwitchSound();
   private disconnect: (() => void) | null = null;
-  private snapshot: InputSnapshot = { pressedCodes: [], lastCode: null, pressCount: 0, soundEnabled: false };
+  private snapshot: InputSnapshot = { pressedCodes: [], lastCode: null, pressCount: 0, soundEnabled: false, volume: 0.5 };
 
   get pressed(): ReadonlySet<string> { return this.down; }
 
@@ -25,6 +30,9 @@ export class KeyboardInput {
   getPressVersion(code: string): number { return this.pressVersions.get(code) ?? 0; }
 
   get resetVersion(): number { return this.resetGeneration; }
+
+  /** Ordered physical edges only, bounded independently of text and native IME. */
+  get recentPresses(): readonly PressEvent[] { return this.pressHistory; }
 
   getSnapshot = (): InputSnapshot => this.snapshot;
 
@@ -51,6 +59,8 @@ export class KeyboardInput {
     if (!this.down.has(code)) {
       this.down.add(code);
       this.pressVersions.set(code, this.getPressVersion(code) + 1);
+      this.pressHistory.push({ code, sequence: this.snapshot.pressCount + 1 });
+      if (this.pressHistory.length > 64) this.pressHistory.shift();
       this.sound.play(code);
       this.publish({ lastCode: code, pressCount: this.snapshot.pressCount + 1 });
     }
@@ -84,6 +94,8 @@ export class KeyboardInput {
   releaseAll(): void {
     this.sources.clear();
     this.down.clear();
+    this.pressHistory.length = 0;
+    this.sound.stopAll();
     // Notify even with no held keys so consumers can cancel a release afterglow.
     this.resetGeneration++;
     this.publish();
@@ -94,11 +106,29 @@ export class KeyboardInput {
     if (enabled !== this.snapshot.soundEnabled) this.publish({ soundEnabled: enabled });
   }
 
+  setVolume(volume: number): void {
+    const next = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 0));
+    this.sound.setVolume(next);
+    if (next !== this.snapshot.volume) this.publish({ volume: next });
+  }
+
+  setSoundProfile(profile: ThemeId): void { this.sound.setProfile(profile); }
+  audioDiagnostics() { return this.sound.diagnostics(); }
+
   connect(): () => void {
     if (this.disconnect) return this.disconnect;
     this.sound.setEnabled(this.snapshot.soundEnabled);
+    this.sound.setVolume(this.snapshot.volume);
+    this.sound.setHidden(document.hidden);
     const keydown = (event: KeyboardEvent) => {
       if (event.repeat) return;
+      // Controls keep native navigation and never become physical typing strikes.
+      const target = event.target;
+      if (target instanceof Element && (
+        target.closest('[data-keyboard-controls], dialog[open]') ||
+        target.closest('button, a[href], select, input, [contenteditable="true"]') ||
+        (target.closest('textarea') && !target.closest('#typing-space, [data-keyboard-input]'))
+      )) return;
       this.press(event.code);
     };
     const keyup = (event: KeyboardEvent) => {
@@ -107,7 +137,7 @@ export class KeyboardInput {
       if (event.code === 'MetaLeft' || event.code === 'MetaRight') this.releaseSource('physical');
     };
     const blur = () => this.releaseAll();
-    const visibility = () => { if (document.hidden) this.releaseAll(); };
+    const visibility = () => { this.sound.setHidden(document.hidden); if (document.hidden) this.releaseAll(); };
     window.addEventListener('keydown', keydown);
     window.addEventListener('keyup', keyup);
     window.addEventListener('blur', blur);

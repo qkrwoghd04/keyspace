@@ -22,7 +22,7 @@ export class KeyboardModel {
   private readonly indicatorMaterial = new THREE.MeshStandardMaterial({emissiveIntensity: 0.35, roughness: 0.6});
   private readonly color = new THREE.Color();
 
-  constructor() {
+  constructor(legendTexture?: THREE.Texture) {
     this.group.name = 'KEYSPACE / 01';
     const {body: housingMaterial, edge: edgeMaterial, plate: plateMaterial} = this.caseMaterials;
     const width = BOARD_WIDTH + 0.65;
@@ -43,7 +43,7 @@ export class KeyboardModel {
 
     const materials = this.capMaterials;
     const geometries = new Map<number, THREE.BufferGeometry>();
-    const atlas = createLegendAtlas();
+    const atlas = legendTexture ? { texture: legendTexture } : createLegendAtlas();
     // Matte ink stays readable beneath the glass preset's softbox reflections.
     const legendMaterial = () => new THREE.MeshPhysicalMaterial({
       map: atlas.texture, emissiveMap: atlas.texture, transparent: true, roughness: 1,
@@ -126,7 +126,7 @@ export class KeyboardModel {
   }
 
   clearEffects(input: KeyboardInput) {
-    for (const key of this.keys) key.clearEffects(input.getPressVersion(key.definition.code));
+    for (const key of this.keys) key.clearEffects(input.getPressVersion(key.definition.code), input.pressed.has(key.definition.code));
   }
 
   update(delta: number, input: KeyboardInput, reducedMotion: boolean) {
@@ -137,19 +137,27 @@ export class KeyboardModel {
 }
 
 /** Shared GPU resources are released exactly once, including generated textures. */
-export function disposeObject(root: THREE.Object3D) {
+export function disposeObject(root: THREE.Object3D, sharedTextures: ReadonlySet<THREE.Texture> = new Set()) {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
   root.traverse(object => {
-    if (!(object instanceof THREE.Mesh)) return;
+    if (!(object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line)) return;
     geometries.add(object.geometry);
+    // Instanced attributes belong to the object, not its shared geometry.
+    if (object instanceof THREE.InstancedMesh) object.dispose();
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
       materials.add(material);
       for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
+      if (material instanceof THREE.ShaderMaterial) {
+        for (const uniform of Object.values(material.uniforms)) {
+          if (uniform.value instanceof THREE.Texture) textures.add(uniform.value);
+          if (Array.isArray(uniform.value)) for (const value of uniform.value) if (value instanceof THREE.Texture) textures.add(value);
+        }
+      }
     }
   });
   geometries.forEach(geometry => geometry.dispose());
   materials.forEach(material => material.dispose());
-  textures.forEach(texture => texture.dispose());
+  textures.forEach(texture => { if (!sharedTextures.has(texture)) texture.dispose(); });
 }

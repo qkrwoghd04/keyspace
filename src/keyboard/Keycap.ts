@@ -72,8 +72,12 @@ export class Keycap {
     this.ring.material.color.copy(this.glow.material.color);
   }
 
-  clearEffects(pressVersion: number) {
+  clearEffects(pressVersion: number, pressed = false) {
     this.pressVersion = pressVersion;
+    this.wasPressed = pressed;
+    this.travel = pressed ? -0.205 : 0;
+    this.velocity = 0;
+    this.group.position.y = this.restY + this.travel;
     this.pulseAge = Infinity;
     this.light = this.effect.idleOpacity;
     this.glow.material.opacity = this.light;

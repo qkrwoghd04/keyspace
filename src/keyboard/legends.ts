@@ -47,8 +47,8 @@ export function createLegendAtlas() {
   return { texture };
 }
 
-export function legendGeometry(key: KeyDefinition, index: number) {
-  const geometry = new THREE.PlaneGeometry(key.width - 0.32, 0.59, 1, 8);
+export function legendGeometry(key: KeyDefinition, index: number, widthSegments = 1) {
+  const geometry = new THREE.PlaneGeometry(key.width - 0.32, 0.59, widthSegments, 8);
   const position = geometry.getAttribute('position');
   const uv = geometry.getAttribute('uv');
   const rows = Math.ceil(KEYS.length / COLUMNS);
