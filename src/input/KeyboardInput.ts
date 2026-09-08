@@ -12,12 +12,19 @@ export interface InputSnapshot {
 export class KeyboardInput {
   private readonly down = new Set<string>();
   private readonly sources = new Map<string, Set<string>>();
+  private readonly pressVersions = new Map<string, number>();
+  private resetGeneration = 0;
   private readonly listeners = new Set<() => void>();
   private readonly sound = new SwitchSound();
   private disconnect: (() => void) | null = null;
   private snapshot: InputSnapshot = { pressedCodes: [], lastCode: null, pressCount: 0, soundEnabled: false };
 
   get pressed(): ReadonlySet<string> { return this.down; }
+
+  /** Monotonic versions preserve short taps that finish between rendered frames. */
+  getPressVersion(code: string): number { return this.pressVersions.get(code) ?? 0; }
+
+  get resetVersion(): number { return this.resetGeneration; }
 
   getSnapshot = (): InputSnapshot => this.snapshot;
 
@@ -43,6 +50,7 @@ export class KeyboardInput {
     holds.add(source);
     if (!this.down.has(code)) {
       this.down.add(code);
+      this.pressVersions.set(code, this.getPressVersion(code) + 1);
       this.sound.play(code);
       this.publish({ lastCode: code, pressCount: this.snapshot.pressCount + 1 });
     }
@@ -74,9 +82,10 @@ export class KeyboardInput {
   }
 
   releaseAll(): void {
-    if (this.down.size === 0) return;
     this.sources.clear();
     this.down.clear();
+    // Notify even with no held keys so consumers can cancel a release afterglow.
+    this.resetGeneration++;
     this.publish();
   }
 

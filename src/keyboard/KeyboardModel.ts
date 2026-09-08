@@ -4,18 +4,27 @@ import { BOARD_WIDTH, KEYS } from './layout';
 import { keycapGeometry } from './geometry';
 import { createLegendAtlas } from './legends';
 import { Keycap } from './Keycap';
+import { createGlowTexture, createRingGeometry } from './effects';
+import { DEFAULT_PRESET, type KeyboardPreset, type MaterialPreset } from './presets';
+import type { KeyboardInput } from '../input/KeyboardInput';
+
+const TONES = ['ivory', 'gray', 'orange'] as const;
+const pair = () => [new THREE.MeshPhysicalMaterial(), new THREE.MeshPhysicalMaterial()] as const;
 
 export class KeyboardModel {
   readonly group = new THREE.Group();
   readonly keys: Keycap[] = [];
   readonly hitTargets: THREE.Mesh[] = [];
   readonly bounds: THREE.Box3;
+  private readonly caseMaterials = {body: new THREE.MeshPhysicalMaterial(), edge: new THREE.MeshPhysicalMaterial(), plate: new THREE.MeshPhysicalMaterial()};
+  private readonly capMaterials = {ivory: [...pair()], gray: [...pair()], orange: [...pair()]};
+  private readonly legendMaterials: Record<typeof TONES[number], THREE.MeshPhysicalMaterial>;
+  private readonly indicatorMaterial = new THREE.MeshStandardMaterial({emissiveIntensity: 0.35, roughness: 0.6});
+  private readonly color = new THREE.Color();
 
   constructor() {
     this.group.name = 'KEYSPACE / 01';
-    const housingMaterial = new THREE.MeshStandardMaterial({color: '#30322f', roughness: 0.69, metalness: 0.48});
-    const edgeMaterial = new THREE.MeshStandardMaterial({color: '#565750', roughness: 0.48, metalness: 0.7});
-    const plateMaterial = new THREE.MeshStandardMaterial({color: '#242622', roughness: 0.9, metalness: 0.12});
+    const {body: housingMaterial, edge: edgeMaterial, plate: plateMaterial} = this.caseMaterials;
     const width = BOARD_WIDTH + 0.65;
     const depth = 6.96;
     const addBox = (w: number, h: number, d: number, y: number, radius: number, material: THREE.Material) => {
@@ -32,18 +41,22 @@ export class KeyboardModel {
     addBox(width, 0.30, depth, 0.706, 0.135, housingMaterial);
     addBox(BOARD_WIDTH + 0.115, 0.055, 6.43, 0.837, 0.025, plateMaterial);
 
-    const ivorySide = new THREE.MeshStandardMaterial({color: '#c6c2b4', roughness: 0.82});
-    const ivoryTop = new THREE.MeshStandardMaterial({color: '#eeebdd', roughness: 0.77});
-    const graySide = new THREE.MeshStandardMaterial({color: '#858276', roughness: 0.82});
-    const grayTop = new THREE.MeshStandardMaterial({color: '#aaa598', roughness: 0.76});
-    const orangeSide = new THREE.MeshStandardMaterial({color: '#ac4a22', roughness: 0.72});
-    const orangeTop = new THREE.MeshStandardMaterial({color: '#db6935', roughness: 0.74});
-    const materials = {ivory: [ivorySide, ivoryTop], gray: [graySide, grayTop], orange: [orangeSide, orangeTop]};
+    const materials = this.capMaterials;
     const geometries = new Map<number, THREE.BufferGeometry>();
     const atlas = createLegendAtlas();
+    // Matte ink stays readable beneath the glass preset's softbox reflections.
+    const legendMaterial = () => new THREE.MeshPhysicalMaterial({
+      map: atlas.texture, emissiveMap: atlas.texture, transparent: true, roughness: 1,
+      specularIntensity: 0, envMapIntensity: 0,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+    });
+    this.legendMaterials = {ivory: legendMaterial(), gray: legendMaterial(), orange: legendMaterial()};
+    const glowTexture = createGlowTexture();
+    const glowGeometry = new THREE.PlaneGeometry(1, 1);
+    const ringGeometry = createRingGeometry();
     KEYS.forEach((definition, index) => {
       if (!geometries.has(definition.width)) geometries.set(definition.width, keycapGeometry(definition.width));
-      const key = new Keycap(definition, index, geometries.get(definition.width)!, materials[definition.tone], atlas.material, BOARD_WIDTH / 2, 2.625);
+      const key = new Keycap(definition, index, geometries.get(definition.width)!, materials[definition.tone], this.legendMaterials[definition.tone], BOARD_WIDTH / 2, 2.625, glowTexture, glowGeometry, ringGeometry);
       this.keys.push(key);
       this.hitTargets.push(key.mesh);
       this.group.add(key.group, key.glow);
@@ -77,16 +90,48 @@ export class KeyboardModel {
     const badgeMesh = new THREE.Mesh(new THREE.PlaneGeometry(3.9, 0.28), new THREE.MeshStandardMaterial({map: badgeTexture, transparent: true, roughness: 0.8, depthWrite: false}));
     badgeMesh.position.set(-width / 2 + 2.45, 0.716, depth / 2 + 0.003);
     this.group.add(badgeMesh);
-    const indicator = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.15, 4, 8), new THREE.MeshStandardMaterial({color: '#d88a50', emissive: '#e88a40', emissiveIntensity: 0.35, roughness: 0.6}));
+    const indicator = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.15, 4, 8), this.indicatorMaterial);
     indicator.rotation.z = Math.PI / 2;
     indicator.position.set(width / 2 - 0.61, 0.711, depth / 2 + 0.002);
     this.group.add(indicator);
     this.bounds = new THREE.Box3().setFromObject(this.group);
+    this.updateAppearance(DEFAULT_PRESET, 1);
   }
 
-  update(delta: number, pressed: ReadonlySet<string>, reducedMotion: boolean) {
+  private mixMaterial(material: THREE.MeshPhysicalMaterial, target: MaterialPreset, blend: number, environment: number) {
+    material.color.lerp(this.color.set(target.color), blend);
+    material.roughness = THREE.MathUtils.lerp(material.roughness, target.roughness, blend);
+    material.metalness = THREE.MathUtils.lerp(material.metalness, target.metalness, blend);
+    material.transmission = THREE.MathUtils.lerp(material.transmission, target.transmission ?? 0, blend);
+    material.thickness = THREE.MathUtils.lerp(material.thickness, target.thickness ?? 0, blend);
+    material.clearcoat = THREE.MathUtils.lerp(material.clearcoat, target.clearcoat ?? 0, blend);
+    material.clearcoatRoughness = 0.2;
+    material.ior = THREE.MathUtils.lerp(material.ior, target.ior ?? 1.5, blend);
+    material.envMapIntensity = THREE.MathUtils.lerp(material.envMapIntensity, environment, blend);
+  }
+
+  updateAppearance(preset: KeyboardPreset, blend: number) {
+    for (const role of ['body', 'edge', 'plate'] as const) this.mixMaterial(this.caseMaterials[role], preset.housing[role], blend, preset.mood.environmentIntensity);
+    for (const tone of TONES) {
+      this.mixMaterial(this.capMaterials[tone][0], preset.keycaps[tone].side, blend, preset.mood.environmentIntensity);
+      this.mixMaterial(this.capMaterials[tone][1], preset.keycaps[tone].top, blend, preset.mood.environmentIntensity);
+      const legend = this.legendMaterials[tone];
+      legend.color.lerp(this.color.set(preset.keycaps[tone].legend), blend);
+      legend.emissive.copy(legend.color);
+      legend.emissiveIntensity = THREE.MathUtils.lerp(legend.emissiveIntensity, preset.mood.legendGlow, blend);
+    }
+    this.indicatorMaterial.color.lerp(this.color.set(preset.accent), blend);
+    this.indicatorMaterial.emissive.copy(this.indicatorMaterial.color);
+    for (const key of this.keys) key.setEffect(preset.effect, blend);
+  }
+
+  clearEffects(input: KeyboardInput) {
+    for (const key of this.keys) key.clearEffects(input.getPressVersion(key.definition.code));
+  }
+
+  update(delta: number, input: KeyboardInput, reducedMotion: boolean) {
     let moving = false;
-    for (const key of this.keys) moving = key.update(delta, pressed.has(key.definition.code), reducedMotion) || moving;
+    for (const key of this.keys) moving = key.update(delta, input.pressed.has(key.definition.code), reducedMotion, input.getPressVersion(key.definition.code)) || moving;
     return moving;
   }
 }

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { KeyboardInput } from '../input/KeyboardInput';
 import { KeyboardModel, disposeObject } from './KeyboardModel';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { DEFAULT_PRESET, type KeyboardPreset } from './presets';
 
 export class Studio {
   private readonly scene = new THREE.Scene();
@@ -21,6 +23,18 @@ export class Studio {
   private targetY = 0;
   private disposed = false;
   private reducedMotion = false;
+  private preset: KeyboardPreset = DEFAULT_PRESET;
+  private transitionRemaining = 0;
+  private inputResetVersion = 0;
+  private readonly ambient = new THREE.HemisphereLight();
+  private readonly keyLight = new THREE.DirectionalLight();
+  private readonly fillLight = new THREE.DirectionalLight();
+  private readonly rimLight = new THREE.DirectionalLight();
+  private readonly shadowMaterial = new THREE.ShadowMaterial();
+  private contactMaterial!: THREE.MeshBasicMaterial;
+  private readonly environment: THREE.WebGLRenderTarget;
+  private readonly color = new THREE.Color();
+  private readonly lightPosition = new THREE.Vector3();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -36,12 +50,13 @@ export class Studio {
     this.renderer.toneMappingExposure = 1.12;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.transmissionResolutionScale = 0.5;
     this.camera.position.set(2.1, 15.8, 20);
     this.camera.lookAt(0, 0.50, 0);
     this.camera.updateMatrixWorld();
 
-    const ambient = new THREE.HemisphereLight('#fff9ec', '#b3b1a8', 1.9);
-    const keyLight = new THREE.DirectionalLight('#fff5e5', 2.8);
+    const ambient = this.ambient;
+    const keyLight = this.keyLight;
     keyLight.position.set(-7, 12, 5);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.set(2048, 2048);
@@ -54,22 +69,35 @@ export class Studio {
     keyLight.shadow.normalBias = 0.018;
     keyLight.shadow.bias = -0.0003;
     keyLight.shadow.radius = 4;
-    const fill = new THREE.DirectionalLight('#f1f5ed', 1.15);
+    const fill = this.fillLight;
     fill.position.set(7, 5, -8);
-    this.scene.add(ambient, keyLight, fill);
+    this.scene.add(ambient, keyLight, fill, this.rimLight);
     this.model = new KeyboardModel();
     this.scene.add(this.model.group);
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.ShadowMaterial({opacity: 0.09}));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), this.shadowMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.015;
     floor.receiveShadow = true;
     this.scene.add(floor);
     this.addContactShadow();
+    const room = new RoomEnvironment();
+    const generator = new THREE.PMREMGenerator(this.renderer);
+    this.environment = generator.fromScene(room, 0.04, 0.1, 100, {size: 128});
+    this.scene.environment = this.environment.texture;
+    room.dispose();
+    generator.dispose();
+    this.applyAppearance(1);
+    this.inputResetVersion = input.resetVersion;
+    this.model.clearEffects(input);
 
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(canvas.parentElement!);
     this.disconnectInput = input.subscribe(() => {
+      if (input.resetVersion !== this.inputResetVersion) {
+        this.inputResetVersion = input.resetVersion;
+        this.model.clearEffects(input);
+      }
       if (input.pressed.size) this.lastTyping = performance.now();
       this.wake();
     });
@@ -90,8 +118,38 @@ export class Studio {
     if (reduced) {
       this.targetX = this.targetY = 0;
       this.model.group.rotation.set(0, 0, 0);
+      this.transitionRemaining = 0;
+      this.applyAppearance(1);
     }
     this.wake();
+  }
+
+  setPreset(preset: KeyboardPreset, immediate = false) {
+    if (this.preset === preset && !immediate) return;
+    this.preset = preset;
+    this.transitionRemaining = this.reducedMotion || immediate ? 0 : 0.2;
+    if (!this.transitionRemaining) this.applyAppearance(1);
+    this.wake();
+  }
+
+  private applyAppearance(blend: number) {
+    const {lighting, mood} = this.preset;
+    this.ambient.color.lerp(this.color.set(lighting.sky), blend);
+    this.ambient.groundColor.lerp(this.color.set(lighting.ground), blend);
+    this.ambient.intensity = THREE.MathUtils.lerp(this.ambient.intensity, lighting.ambient, blend);
+    this.mixLight(this.keyLight, lighting.key, blend);
+    this.mixLight(this.fillLight, lighting.fill, blend);
+    this.mixLight(this.rimLight, lighting.rim, blend);
+    this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, lighting.exposure, blend);
+    this.shadowMaterial.opacity = THREE.MathUtils.lerp(this.shadowMaterial.opacity, mood.shadowOpacity, blend);
+    this.contactMaterial.opacity = THREE.MathUtils.lerp(this.contactMaterial.opacity, mood.contactOpacity, blend);
+    this.model.updateAppearance(this.preset, blend);
+  }
+
+  private mixLight(light: THREE.DirectionalLight, target: KeyboardPreset['lighting']['key'], blend: number) {
+    light.color.lerp(this.color.set(target.color), blend);
+    light.intensity = THREE.MathUtils.lerp(light.intensity, target.intensity, blend);
+    light.position.lerp(this.lightPosition.fromArray(target.position), blend);
   }
 
   private addContactShadow() {
@@ -106,7 +164,8 @@ export class Studio {
     context.fill();
     const texture = new THREE.CanvasTexture(textureCanvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(20.1, 10.2), new THREE.MeshBasicMaterial({map: texture, transparent: true, depthWrite: false, opacity: 0.78}));
+    this.contactMaterial = new THREE.MeshBasicMaterial({map: texture, transparent: true, depthWrite: false, opacity: 0.78});
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(20.1, 10.2), this.contactMaterial);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(0, 0.002, 0.16);
     this.scene.add(mesh);
@@ -225,7 +284,11 @@ export class Studio {
     if (this.disposed) return;
     const delta = Math.min((now - this.previousFrame) / 1000, 0.04);
     this.previousFrame = now;
-    let moving = this.model.update(delta, this.input.pressed, this.reducedMotion);
+    if (this.transitionRemaining > 0) {
+      this.applyAppearance(Math.min(delta / this.transitionRemaining, 1));
+      this.transitionRemaining = Math.max(0, this.transitionRemaining - delta);
+    }
+    let moving = this.model.update(delta, this.input, this.reducedMotion) || this.transitionRemaining > 0;
     if (!this.reducedMotion && !this.input.pressed.size && now - this.lastTyping > 750) {
       const rotation = this.model.group.rotation;
       const blend = 1 - Math.exp(-7 * delta);
@@ -254,6 +317,7 @@ export class Studio {
     document.removeEventListener('visibilitychange', this.visibilityChange);
     this.scene.traverse(object => { if (object instanceof THREE.DirectionalLight) object.shadow.dispose(); });
     disposeObject(this.scene);
+    this.environment.dispose();
     this.renderer.dispose();
   }
 }

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import KeyboardScene from './components/KeyboardScene';
 import { KeyboardInput } from './input/KeyboardInput';
 import { KEY_BY_CODE } from './keyboard/layout';
+import { DEFAULT_PRESET, PRESETS } from './keyboard/presets';
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -41,8 +42,38 @@ export default function App() {
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
   const [resetMessage, setResetMessage] = useState('');
+  const [preset, setPreset] = useState(DEFAULT_PRESET);
+
+  const theme = {
+    '--paper': preset.background,
+    '--ink': preset.ui.ink,
+    '--muted': preset.ui.muted,
+    '--subtle': preset.ui.subtle,
+    '--line': preset.ui.line,
+    '--selection': preset.ui.selection,
+    '--control-surface': preset.ui.controlSurface,
+    '--control-active': preset.ui.controlActive,
+    '--accent': preset.accent,
+    '--swatch-housing': preset.housing.body.color,
+    '--swatch-keycap': preset.keycaps.ivory.top.color,
+    '--swatch-accent': preset.keycaps.orange.top.color,
+    colorScheme: preset.id === 'dark' || preset.id === 'neon' ? 'dark' : 'light',
+  } as CSSProperties;
 
   useEffect(() => input.connect(), [input]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousBackground = root.style.backgroundColor;
+    const browserTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previousTheme = browserTheme?.content;
+    root.style.backgroundColor = preset.background;
+    if (browserTheme) browserTheme.content = preset.background;
+    return () => {
+      root.style.backgroundColor = previousBackground;
+      if (browserTheme && previousTheme !== undefined) browserTheme.content = previousTheme;
+    };
+  }, [preset.background]);
 
   useEffect(() => {
     // Focus once on desktop. Touch devices opt into their software keyboard.
@@ -90,13 +121,28 @@ export default function App() {
   };
 
   return (
-    <div className="keyspace">
+    <div className="keyspace" style={theme} data-preset={preset.id}>
       <header className="site-header">
         <div className="wordmark" aria-label="Keyspace">
           <KeyboardMark />
           <span>KEYSPACE<span className="wordmark-period">.</span></span>
         </div>
-        <span className="header-note">A tactile little escape.</span>
+        <div className="preset-selector" role="group" aria-label="Keyboard style">
+          {PRESETS.map(option => (
+            <button
+              type="button"
+              className="preset-button"
+              key={option.id}
+              aria-label={option.name}
+              aria-pressed={preset.id === option.id}
+              title={option.name}
+              onClick={() => setPreset(option)}
+            >
+              <span className="preset-indicator" aria-hidden="true" />
+              {option.shortName}
+            </button>
+          ))}
+        </div>
       </header>
 
       <main className="playground">
@@ -129,7 +175,7 @@ export default function App() {
         </section>
 
         <div className="keyboard-stage">
-          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} />
+          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} preset={preset} />
         </div>
       </main>
 

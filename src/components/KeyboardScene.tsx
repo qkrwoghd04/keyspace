@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardInput } from '../input/KeyboardInput';
 import { Studio } from '../keyboard/Studio';
+import type { KeyboardPreset } from '../keyboard/presets';
 
 interface KeyboardSceneProps {
   input: KeyboardInput;
   reducedMotion: boolean;
   onVirtualKey: (code: string) => void;
+  preset: KeyboardPreset;
 }
 
-export default function KeyboardScene({input, reducedMotion, onVirtualKey}: KeyboardSceneProps) {
+export default function KeyboardScene({input, reducedMotion, onVirtualKey, preset}: KeyboardSceneProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const studio = useRef<Studio | null>(null);
   const virtualKey = useRef(onVirtualKey);
@@ -20,6 +22,7 @@ export default function KeyboardScene({input, reducedMotion, onVirtualKey}: Keyb
     try {
       studio.current = new Studio(canvas.current, input, code => virtualKey.current(code), () => setUnavailable(true));
       studio.current.setReducedMotion(reducedMotion);
+      studio.current.setPreset(preset, true);
     } catch (error) {
       console.warn('The 3D keyboard could not start.', error);
       setUnavailable(true);
@@ -33,6 +36,7 @@ export default function KeyboardScene({input, reducedMotion, onVirtualKey}: Keyb
   }, [input, unavailable]);
 
   useEffect(() => studio.current?.setReducedMotion(reducedMotion), [reducedMotion]);
+  useEffect(() => studio.current?.setPreset(preset), [preset]);
 
   return (
     <div className={`keyboard-scene${unavailable ? ' keyboard-scene--unavailable' : ''}`}>

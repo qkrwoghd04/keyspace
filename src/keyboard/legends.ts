@@ -20,14 +20,14 @@ export function createLegendAtlas() {
     // Wide caps use a wide physical decal: compensate for its stretching.
     const stretch = Math.max(1, (key.width - 0.32) / 0.68);
     context.scale(1 / stretch, 1);
-    context.fillStyle = key.tone === 'orange' ? '#fff1dc' : '#383a35';
+    context.fillStyle = '#ffffff';
     const isLetter = /^Key[A-Z]$/.test(key.code);
     const isArrow = key.code.startsWith('Arrow');
     context.font = `${isLetter ? 500 : 500} ${isLetter ? 68 : isArrow ? 78 : key.label.length > 3 ? 43 : 49}px "Helvetica Neue", Helvetica, sans-serif`;
     const left = 48;
     if (key.code === 'Space') {
       // A tiny maker's dash, deliberately quiet on the spacebar.
-      context.fillStyle = '#aaa89d';
+      context.globalAlpha = 0.4;
       context.fillRect(CELL * stretch / 2 - 23, 166, 46, 3);
     } else if (key.secondary) {
       context.font = '500 48px "Helvetica Neue", Helvetica, sans-serif';
@@ -44,11 +44,7 @@ export function createLegendAtlas() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
-  const material = new THREE.MeshStandardMaterial({
-    map: texture, transparent: true, roughness: 0.82,
-    depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
-  });
-  return { texture, material };
+  return { texture };
 }
 
 export function legendGeometry(key: KeyDefinition, index: number) {
