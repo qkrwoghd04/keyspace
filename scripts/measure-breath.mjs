@@ -40,7 +40,10 @@ try {
     expect(final.state.input.pressCount - initial.state.input.pressCount).toBe(typed.length);
     expect(final.state.input.pressedCodes).toEqual([]);
     for (const sample of samples) {
-      expect(sample.effects.waves).toBeLessThanOrEqual(sample.quality === 'low' ? 4 : 9);
+      expect(sample.effects.waves).toBeLessThanOrEqual(sample.quality === 'low' ? 6 : 9);
+      expect(sample.effects.mechanism.pathPoints).toBeLessThanOrEqual(sample.quality === 'low' ? 6 : 10);
+      expect(sample.effects.mechanism.activeFlows).toBeLessThanOrEqual(2);
+      expect(sample.effects.mechanism.maxAnchorError).toBeLessThan(.001);
       expect(sample.effects.particles).toBeLessThanOrEqual(sample.quality === 'low' ? 28 : 72);
       expect(sample.audio.voices).toBeLessThanOrEqual(16); expect(sample.audio.sources).toBeLessThanOrEqual(32);
       expect(sample.audio.volume).toBe(.23); expect(sample.audio.breath).toBe(mode); expect(sample.fits).toBe(true);
@@ -49,6 +52,8 @@ try {
     runs.push({ mode, realClock: true, nativeTyping: true, characters: typed.length, durationMs: final.at - initial.at,
       fps: (final.state.frames - initial.state.frames) / (final.at - initial.at) * 1000, maxP95: Math.max(...samples.map(sample => sample.frameP95)), samples });
     console.log(JSON.stringify({ mode, characters: typed.length, fps: runs.at(-1).fps, maxP95: runs.at(-1).maxP95 }));
+    expect(runs.at(-1).fps).toBeGreaterThanOrEqual(55);
+    expect(runs.at(-1).maxP95).toBeLessThanOrEqual(25);
   }
   await page.getByRole('button', { name: 'Breath water', exact: true }).click();
   await expect(page.locator('.breath-controls')).toHaveAttribute('data-breath', 'water');

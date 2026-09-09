@@ -53,9 +53,9 @@ export default class DemonSlayer extends AnimationRuntime {
     this.breathing.setQuality(context.quality);
     this.bounds.set(new THREE.Vector3(-10.5, 0, -5.8), new THREE.Vector3(10.5, 3.9, 5.8));
   }
-  protected override onStrike(key: KeyBody, reduced: boolean) {
+  protected override onStrike(key: KeyBody, reduced: boolean, atMs?: number) {
     const point = { x: key.x, y: key.restY + .53, z: key.z };
-    this.breathing.strike(key.definition.code, point, reduced);
+    this.breathing.strike(key.definition.code, point, reduced, atMs);
     // Enter/Space retain their bounded gesture contract without a screen-wide splash.
     this.signature.start(key.definition.code, reduced);
   }
@@ -64,7 +64,22 @@ export default class DemonSlayer extends AnimationRuntime {
     this.relief.forEach((mesh, i) => { mesh.position.y = reduced ? 0 : Math.sin(this.time * 1.3 + i) * .018; });
     return this.breathing.update(delta, reduced) || !reduced;
   }
-  override onChallengeEvent(event: JudgmentEvent) { super.onChallengeEvent(event.type === 'correct' ? { ...event, code: event.code ?? 'Space' } : event); }
+  override onChallengeEvent(event: JudgmentEvent) {
+    if (event.type === 'finished') {
+      // Completion is an accent, not a physical Enter edge in the input trail.
+      const key = this.keys.find(key => key.definition.code === 'Enter');
+      if (key) this.breathing.strike('SoftwareCommit', { x: key.x, y: key.restY + .53, z: key.z }, false);
+      this.signature.reset(); this.signature.allowed = true; this.signature.start('Enter', false);
+      this.signature.allowed = !this.challengeActive;
+      return;
+    }
+    if (event.type === 'correct' && !event.code) {
+      const key = this.keys.find(key => key.definition.code === 'Space');
+      if (key) this.breathing.strike('SoftwareCommit', { x: key.x, y: key.restY + .53, z: key.z }, false);
+      return;
+    }
+    super.onChallengeEvent(event);
+  }
   override update(delta: number, input: KeyboardInput, reduced: boolean) {
     const sequence = this.context.breath?.softwareSequence ?? 0;
     if (sequence !== this.softwareSequence && !this.challengeActive) {

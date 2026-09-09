@@ -36,7 +36,7 @@ export class ParticlePool {
     for (let i = this.limit; i < this.ages.length; i++) this.ages[i] = 2;
   }
 
-  burst(x: number, y: number, z: number, count: number, speed = 1, spread = .25, size = .05) {
+  burst(x: number, y: number, z: number, count: number, speed = 1, spread = .25, size = .05, direction?: { x: number; z: number }) {
     for (let j = 0; j < Math.min(count, this.limit); j++) {
       const i = this.cursor++ % this.limit, offset = i * 3;
       this.positions[offset] = x + (this.rng() - .5) * spread;
@@ -45,6 +45,10 @@ export class ParticlePool {
       this.velocities[offset] = (this.rng() - .5) * speed;
       this.velocities[offset + 1] = (.3 + this.rng() * .7) * speed;
       this.velocities[offset + 2] = (this.rng() - .5) * speed;
+      if (direction) {
+        this.velocities[offset] = this.velocities[offset] * .25 + direction.x * speed;
+        this.velocities[offset + 2] = this.velocities[offset + 2] * .25 + direction.z * speed;
+      }
       this.ages[i] = 0;
       this.lifetimes[i] = .35 + this.rng() * .8;
       this.sizes[i] = size * (.5 + this.rng() * .7);

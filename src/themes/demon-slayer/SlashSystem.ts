@@ -61,7 +61,6 @@ const fragmentShader = `
 export class SlashSystem {
   private readonly slots: Slash[];
   private readonly transition: Slash;
-  private readonly wake: Slash;
   private cursor = 0;
   private limit = C.trail.maxSlashes as number;
   private transitionSerial = -1;
@@ -73,9 +72,7 @@ export class SlashSystem {
 
   constructor(parent: THREE.Group) {
     this.slots = Array.from({ length: C.trail.maxSlashes }, () => this.create(parent));
-    this.transition = this.create(parent); this.wake = this.create(parent);
-    // A quiet frozen crest behind the keys gives the resting instrument a water silhouette.
-    this.fill(this.wake, { x: -6.7, y: 1.38, z: -3.75 }, { x: 5.9, y: 1.45, z: -3.75 }, 'water', .65, 0, false, 1);
+    this.transition = this.create(parent);
   }
 
   private create(parent: THREE.Group): Slash {
@@ -135,9 +132,6 @@ export class SlashSystem {
     };
     this.slots.forEach((slot, i) => update(slot, i < this.limit && (!reduced || slot.reduced)));
     update(this.transition, !reduced);
-    const wake = this.wake.mesh.material.uniforms;
-    this.wake.mesh.visible = !off;
-    wake.uAge.value = .22; wake.uLife.value = 1; wake.uMorph.value = mix; wake.uOpacity.value = .42 - mix * .2; wake.uReduced.value = 1;
     return this.active > 0;
   }
   setLow(low: boolean) { this.limit = low ? C.trail.lowSlashes : C.trail.maxSlashes; }

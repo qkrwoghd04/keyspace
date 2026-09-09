@@ -10,7 +10,7 @@ export interface InputSnapshot {
   volume: number;
 }
 
-export interface PressEvent { readonly code: string; readonly sequence: number }
+export interface PressEvent { readonly code: string; readonly sequence: number; readonly atMs: number }
 
 /** Physical key state is independent of the browser's text/IME editing pipeline. */
 export class KeyboardInput {
@@ -59,7 +59,7 @@ export class KeyboardInput {
     if (!this.down.has(code)) {
       this.down.add(code);
       this.pressVersions.set(code, this.getPressVersion(code) + 1);
-      this.pressHistory.push({ code, sequence: this.snapshot.pressCount + 1 });
+      this.pressHistory.push({ code, sequence: this.snapshot.pressCount + 1, atMs: performance.now() });
       if (this.pressHistory.length > 64) this.pressHistory.shift();
       this.sound.play(code);
       this.publish({ lastCode: code, pressCount: this.snapshot.pressCount + 1 });

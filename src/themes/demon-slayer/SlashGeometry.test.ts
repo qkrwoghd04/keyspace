@@ -26,7 +26,7 @@ describe('world-space painted slashes', () => {
     const group = new THREE.Group(), system = new SlashSystem(group);
     const original = group.children.map(child => (child as THREE.Mesh).geometry.uuid);
     for (let i = 0; i < 2000; i++) system.emit(from, to, i % 2 ? 'water' : 'sun', 1, false);
-    system.update(.08, 0, false); expect(system.active).toBe(8);
+    system.update(.04, 0, false); expect(system.active).toBe(6);
     expect(group.children.map(child => (child as THREE.Mesh).geometry.uuid)).toEqual(original);
     system.setLow(true); system.update(.05, 0, false); expect(system.active).toBe(3);
     system.awaken(4, false); system.awaken(4, false); expect(system.transitions).toBe(1);

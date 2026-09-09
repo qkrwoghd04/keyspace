@@ -11,6 +11,53 @@ async function rhythm(page: Page, text: string) {
 }
 const telemetry = (page: Page) => page.evaluate(() => window.__keyspace!.state());
 
+test('one living ribbon remembers ten distant keys and both rendered forms touch every anchor', async ({ page }) => {
+  await page.clock.install(); await enter(page); await page.locator('#typing-space').focus();
+  for (const char of 'qpalzmxnwo') { await page.keyboard.type(char); await page.clock.runFor(50); }
+  await page.clock.runFor(140);
+  const state = await telemetry(page), trail = state.effects.trail!;
+  expect(state.effects.mechanism).toMatchObject({ pathPoints: 10, activeFlows: 1 });
+  expect(state.effects.mechanism!.pathLength).toBeGreaterThan(30);
+  expect(state.effects.mechanism!.maxAnchorError).toBeLessThan(.001);
+  expect(trail.anchors).toHaveLength(10);
+  for (const anchor of trail.anchors) for (const samples of [trail.water, trail.sun]) {
+    expect(Math.min(...samples.map(p => Math.hypot(p[0] - anchor.x, p[1] - anchor.y, p[2] - anchor.z)))).toBeLessThan(.001);
+  }
+  expect(trail.water).not.toEqual(trail.sun);
+  await expect(page.locator('#typing-space')).toHaveValue('qpalzmxnwo');
+  await page.clock.runFor(1100);
+  expect((await telemetry(page)).effects.mechanism).toMatchObject({ activeFlows: 0, pathPoints: 0 });
+});
+
+test('same-frame physical edges are retained while repeated holds and software commits do not invent paths', async ({ page }) => {
+  await page.clock.install(); await enter(page); await page.locator('#typing-space').focus();
+  await page.keyboard.type('asdfghjkl;'); await page.clock.runFor(40);
+  expect((await telemetry(page)).effects.mechanism!.pathPoints).toBe(10);
+  await page.getByRole('button', { name: 'Reset typed text' }).click(); await page.locator('#typing-space').focus();
+  await page.keyboard.down('a'); await page.keyboard.down('a'); await page.clock.runFor(40); await page.keyboard.up('a');
+  expect((await telemetry(page)).effects.mechanism!.pathPoints).toBe(1);
+  await page.getByRole('button', { name: 'Reset typed text' }).click(); await page.locator('#typing-space').focus();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.insertText', { text: '한' }); await page.clock.runFor(40);
+  expect((await telemetry(page)).effects.mechanism!.pathPoints).toBe(0);
+  await expect(page.locator('#typing-space')).toHaveValue('한');
+});
+
+test('low Challenge effects collect consecutive judgments without reward admission gaps', async ({ page }) => {
+  await page.clock.install(); await enter(page);
+  await page.getByRole('button', { name: 'Challenge', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Passage language' }).selectOption('english');
+  await page.getByRole('combobox', { name: 'Combo effects' }).selectOption('low');
+  await page.getByRole('button', { name: '시작', exact: true }).click(); await page.clock.runFor(3100);
+  const passage = await page.evaluate(() => window.__challenge!.passage());
+  for (const char of passage.slice(0, 12)) { await page.keyboard.type(char); await page.clock.runFor(10); }
+  const state = await telemetry(page);
+  expect(state.rewards!.bursts).toBe(12);
+  expect(state.effects.mechanism!.pathPoints).toBeLessThanOrEqual(6);
+  expect(state.effects.mechanism!.links).toBeGreaterThan(7);
+  expect(await page.evaluate(() => window.__challenge!.state().race.correct)).toBe(12);
+});
+
 test('breathing controls are theme-local, keyboard-accessible, keep text, selection, volume and canvas', async ({ page }) => {
   await enter(page);
   await page.locator('#typing-space').fill('Keep this / 한글');

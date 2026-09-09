@@ -55,6 +55,7 @@ export interface ThemeDiagnostics {
   signature?: { active: boolean; kind: 'enter' | 'space'; progress: number; starts: number; queued: 0 };
   strikes?: number;
   recentKeys?: string[];
+  trail?: { anchors: { code: string; x: number; y: number; z: number }[]; water: number[][]; sun: number[][] };
   mechanism?: Record<string, number | string | boolean>;
 }
 

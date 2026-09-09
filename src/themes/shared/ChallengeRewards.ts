@@ -91,6 +91,8 @@ export class ChallengeRewards {
       return true;
     }
     this.tier = event.tier;
+    // Native themes collect every judged key; their decoration pools throttle independently.
+    if (this.native) { this.bursts++; return true; }
     if (this.cooldown > 0) return false;
     // Software keyboards may commit text without a physical KeyboardEvent.code.
     // Keep the judgment reward local without inventing a physical key press.

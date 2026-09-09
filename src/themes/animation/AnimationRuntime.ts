@@ -8,7 +8,7 @@ export abstract class AnimationRuntime extends BaseRuntime {
   protected readonly signature = new Signature();
   protected strikes = 0;
   private sequence = 0;
-  protected onStrike(_key: KeyBody, _reduced: boolean): void {}
+  protected onStrike(_key: KeyBody, _reduced: boolean, _atMs?: number): void {}
   override setChallengeActive(active: boolean) {
     if (active === this.challengeActive) return;
     super.setChallengeActive(active); this.signature.allowed = !active; this.signature.reset();
@@ -33,7 +33,7 @@ export abstract class AnimationRuntime extends BaseRuntime {
     for (const event of input.recentPresses) {
       if (event.sequence <= this.sequence) continue;
       const key = this.keys.find(key => key.definition.code === event.code);
-      if (key && !this.challengeActive) { this.strikes++; this.onStrike(key, reduced); }
+      if (key && !this.challengeActive) { this.strikes++; this.onStrike(key, reduced, event.atMs); }
       this.sequence = event.sequence;
     }
     return super.update(delta, input, reduced) || this.signature.active;
