@@ -14,7 +14,7 @@ function scene(background: string, ink: string, muted: string, accent: string, s
   };
 }
 export const ANIMATION_APPEARANCES: Record<AnimationThemeId, SceneAppearance> = {
-  'demon-slayer': scene('#e8eee8', '#203d37', '#607a70', '#318b8f', '#ceded5', '#e2f4f0', '#1c4441', .95),
+  'demon-slayer': scene('#e7eff1', '#233f4c', '#5d7581', '#247b9f', '#ccdce1', '#e5f4f8', '#234751', .99),
   pokemon: scene('#f4eddc', '#383e40', '#797769', '#c95142', '#e4d8be', '#fff3d8', '#c5bd91', 1),
   'spider-verse': scene('#eac9b2', '#292031', '#71515f', '#a32356', '#dab296', '#fff0d9', '#754369', .97),
   howl: scene('#e4e8db', '#374a49', '#71807a', '#996947', '#ccd5c5', '#fff2cf', '#819b8c', .95),

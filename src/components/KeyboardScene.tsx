@@ -3,8 +3,10 @@ import type { KeyboardInput } from '../input/KeyboardInput';
 import { Studio } from '../keyboard/Studio';
 import type { ThemeDefinition } from '../themes/types';
 import type { ChallengeChannel } from '../challenge/ChallengeChannel';
+import type { BreathController } from '../themes/demon-slayer/BreathController';
 
 interface KeyboardSceneProps {
+  breath: BreathController;
   challengeChannel: ChallengeChannel;
   input: KeyboardInput;
   reducedMotion: boolean;
@@ -14,7 +16,7 @@ interface KeyboardSceneProps {
   onThemeError: (theme: ThemeDefinition, error: unknown) => void;
 }
 
-export default function KeyboardScene({input, reducedMotion, onVirtualKey, theme, onThemeReady, onThemeError, challengeChannel}: KeyboardSceneProps) {
+export default function KeyboardScene({input, reducedMotion, onVirtualKey, theme, onThemeReady, onThemeError, challengeChannel, breath}: KeyboardSceneProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const studio = useRef<Studio | null>(null);
   const virtualKey = useRef(onVirtualKey);
@@ -26,7 +28,7 @@ export default function KeyboardScene({input, reducedMotion, onVirtualKey, theme
   useEffect(() => {
     if (!canvas.current || unavailable) return;
     try {
-      studio.current = new Studio(canvas.current, input, code => virtualKey.current(code), () => setUnavailable(true));
+      studio.current = new Studio(canvas.current, input, code => virtualKey.current(code), () => setUnavailable(true), breath);
       studio.current.setReducedMotion(reducedMotion);
     } catch (error) {
       console.warn('The 3D keyboard could not start.', error);

@@ -1,9 +1,10 @@
 import type { ThemeId } from '../themes/types';
 import { random } from '../themes/shared/random';
+import { SUN_SOUND, WATER_SOUND } from '../themes/demon-slayer/sound';
 
 export type SoundKeyClass = 'character' | 'space' | 'enter';
 interface Frame { t: number; white: number; low: number; high: number; pitch: number; body: number; keyClass: SoundKeyClass }
-interface SoundProfile { duration: number; releaseDuration: number; render: (frame: Frame) => number }
+export interface SoundProfile { duration: number; releaseDuration: number; render: (frame: Frame) => number }
 const TAU = Math.PI * 2;
 const tone = (frequency: number, t: number) => Math.sin(TAU * frequency * t);
 const envelope = (t: number, decay: number, attack = .0006) => t < 0 ? 0 : (1 - Math.exp(-t / attack)) * Math.exp(-t / decay);
@@ -47,10 +48,7 @@ export const SOUND_PROFILES: Record<ThemeId, SoundProfile> = {
     duration: .265, releaseDuration: .085,
     render: ({ t, low, pitch: p, body }) => tone(115 * p, t) * envelope(t, .038, .002) * body * .6 + Math.asin(tone(370 * p, t)) / (Math.PI / 2) * envelope(t, .039, .0012) * .65 + tone(746 * p, t) * envelope(t, .02) * .16 + tone(370 * p, t - .027) * envelope(t - .027, .024) * .1 + tone(375 * p, t - .043) * envelope(t - .043, .018) * .065 + low * envelope(t, .008) * .22,
   },
-  'demon-slayer': {
-    duration: .23, releaseDuration: .055,
-    render: ({ t, high, low, pitch: p, keyClass }) => high * envelope(t, .019, .003) * .45 + drop(690 * p, 180 * p, .017, t) * envelope(t, .03) * .5 + tone(2147 * p, t) * envelope(t, .021) * .14 + low * envelope(t - .012, .019, .004) * .6 + (keyClass === 'enter' ? high * envelope(t - .027, .041, .009) * .5 : keyClass === 'space' ? low * envelope(t - .018, .044, .008) * .7 : 0),
-  },
+  'demon-slayer': WATER_SOUND,
   pokemon: {
     duration: .18, releaseDuration: .055,
     render: ({ t, high, pitch: p, keyClass }) => drop(1030 * p, 470 * p, .012, t) * envelope(t, .021) * .55 + tone(210 * p, t) * envelope(t, .011) * .3 + high * envelope(t, .002) * .4 + (keyClass === 'enter' ? tone(1327 * p, t) * envelope(t - .035, .026) * .2 : keyClass === 'space' ? Math.sin(t * 4900 + Math.sin(t * 900) * 3) * envelope(t - .015, .021) * .16 : 0),
@@ -72,8 +70,8 @@ export const SOUND_PROFILES: Record<ThemeId, SoundProfile> = {
 export function soundKeyClass(code: string): SoundKeyClass { return code === 'Space' ? 'space' : code === 'Enter' ? 'enter' : 'character'; }
 
 /** Deterministic PCM, cached by the engine. Zero-mean, tapered and peak bounded. */
-export function synthesizeSound(id: ThemeId, keyClass: SoundKeyClass, release: boolean, sampleRate: number): Float32Array<ArrayBuffer> {
-  const profile = SOUND_PROFILES[id];
+export function synthesizeSound(id: ThemeId, keyClass: SoundKeyClass, release: boolean, sampleRate: number, breath: 'water' | 'sun' = 'water'): Float32Array<ArrayBuffer> {
+  const profile = id === 'demon-slayer' && breath === 'sun' ? SUN_SOUND : SOUND_PROFILES[id];
   const width = keyClass === 'space' ? 1.18 : keyClass === 'enter' ? 1.08 : 1;
   const duration = Math.min(.3, (release ? profile.releaseDuration : profile.duration) * width);
   const samples = new Float32Array(Math.ceil(duration * sampleRate));

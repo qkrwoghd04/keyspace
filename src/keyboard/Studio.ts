@@ -9,6 +9,7 @@ import { DEFAULT_THEME } from '../themes/registry';
 import { LOW_QUALITY, STANDARD_QUALITY, type QualitySettings, type SceneAppearance, type ThemeDefinition, type ThemeRuntime } from '../themes/types';
 import type { ChallengeChannel, ChallengePresentation, PresentationEvent } from '../challenge/ChallengeChannel';
 import { ChallengeRewards } from '../themes/shared/ChallengeRewards';
+import type { BreathController } from '../themes/demon-slayer/BreathController';
 
 declare global {
   interface Window {
@@ -59,12 +60,14 @@ export class Studio {
   private challengeState: ChallengePresentation = { enabled: false, racing: false, intensity: 'low' };
   private rewards: ChallengeRewards | null = null;
   private disconnectChallenge: (() => void) | null = null;
+  private readonly disconnectBreath: () => void;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly input: KeyboardInput,
     private readonly virtualKey: (code: string) => void,
     private readonly onUnavailable: () => void,
+    private readonly breath: BreathController,
   ) {
     this.renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true, powerPreference: 'low-power'});
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.dpr));
@@ -125,6 +128,7 @@ export class Studio {
       if (input.pressed.size) this.lastTyping = performance.now();
       this.wake();
     });
+    this.disconnectBreath = breath.subscribe(this.wake);
     canvas.addEventListener('pointerdown', this.pointerDown);
     canvas.addEventListener('pointermove', this.pointerMove);
     canvas.addEventListener('pointerup', this.pointerUp);
@@ -157,6 +161,7 @@ export class Studio {
       if (event.type === 'presentation') {
         this.challengeState = event.value;
         this.model.setChallengeActive?.(event.value.enabled);
+        this.model.setEffectIntensity?.(event.value.enabled ? event.value.intensity : 'full');
         if (!event.value.enabled) { this.rewards?.dispose(); this.rewards = null; }
         else {
           this.rewards ??= new ChallengeRewards(this.theme.id, this.model, this.quality);
@@ -186,7 +191,7 @@ export class Studio {
     try {
       const create = await theme.load();
       if (this.disposed || request !== this.requestVersion) return false;
-      next = create({ legendTexture: this.legendTexture, quality: this.quality });
+      next = create({ legendTexture: this.legendTexture, quality: this.quality, breath: this.breath });
       await this.renderer.compileAsync(next.group, this.camera, this.scene);
       if (this.disposed || request !== this.requestVersion) return false;
       this.resetPointers();
@@ -194,6 +199,7 @@ export class Studio {
       next.setQuality(this.quality);
       next.reset(this.input);
       next.setChallengeActive?.(this.challengeState.enabled);
+      next.setEffectIntensity?.(this.challengeState.enabled ? this.challengeState.intensity : 'full');
       const previous = this.model;
       this.rewards?.dispose(); this.rewards = null;
       this.scene.remove(previous.group);
@@ -446,6 +452,7 @@ export class Studio {
     cancelAnimationFrame(this.frame);
     this.resetPointers();
     this.disconnectInput();
+    this.disconnectBreath();
     this.disconnectChallenge?.(); this.rewards?.dispose(); this.rewards = null;
     this.observer.disconnect();
     this.canvas.removeEventListener('pointerdown', this.pointerDown);

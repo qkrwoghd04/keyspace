@@ -7,12 +7,26 @@
 - Node.js 24.14.1, npm 11.11.0, Vite 7.3.6, Three.js 0.180.0.
 - macOS, Google Chrome 152의 headless 모드, 실제 WebGL2 사용.
 - GPU 문자열: `ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)`.
-- TypeScript 검사, Vitest 54개 통과. Challenge의 렌더링 없는 판정, 조합, 저장과 세션 검사 29개 포함.
-- Playwright 기존 입력 및 화면 회귀 44개, Challenge 13개, 60초 부하 및 140회 전환 검사 1개 통과. 전체 58개 실행 시간 약 4.4분.
+- TypeScript 검사, Vitest 73개 통과. Challenge의 렌더링 없는 판정, 조합, 저장과 세션 검사 29개와 탄지로 호흡의 상태, 관찰, GPU 풀 및 소리 관련 추가 19개 포함.
+- Playwright 기존 입력 및 화면 회귀 44개, Challenge 13개, 호흡 전용 14개, 60초 부하 및 140회 전환 검사 1개 통과. 전체 72개 실행 시간 약 6분.
 - 신규 ANIMATION 전용 검사 19개 포함. 기존 Inferno / Jelly 및 native 편집 회귀도 같은 전체 실행에서 통과.
 - Challenge의 한글 조합, 규칙, 저장 실패, Ghost와 검증 한계는 [별도 검증 문서](challenge.md) 참고. Playground 개인 문장 저장 없음, 브라우저 저장소는 Challenge 최소 결과와 이력에 한정.
-- 빌드된 로컬 프로덕션 미리보기에서 14개 전환, 단일 canvas, 문장 보존, native 편집, 정적 썸네일과 실패 청크 재시도 통과. Challenge의 30초 결과, 저장, 실제 Ghost 선택과 재도전 포커스 및 Playground 복귀 확인. 두 개발 전용 진단 API 제외와 처리되지 않은 브라우저 오류 0개 확인.
-- Three.js vendor chunk 533.46 kB / gzip 135.37 kB에 대한 Vite 크기 경고 잔존. 오류는 아니며 기존 확장 모델 6개와 애니메이션 모델 5개는 개별 지연 로드 청크로 분리. Challenge 로직과 UI도 별도 25.92 kB / gzip 10.13 kB 청크로 첫 선택 시 지연 로드.
+- 빌드된 로컬 프로덕션 미리보기에서 14개 전환, 단일 canvas, 문장 보존, native 편집, 정적 썸네일과 실패 청크 재시도 통과. Challenge의 30초 결과, 저장, 실제 Ghost 선택과 재도전 포커스 및 Playground 복귀 확인. Water/Sun 수동 전환과 Auto 각성 후 66자 정답 및 26.4 WPM 결과까지 확인. 두 개발 전용 진단 API 제외와 처리되지 않은 브라우저 오류 0개 확인.
+- Three.js vendor chunk 533.46 kB / gzip 135.37 kB에 대한 Vite 크기 경고 잔존. 오류는 아니며 기존 확장 모델 6개와 애니메이션 모델 5개는 개별 지연 로드 청크로 분리. Challenge는 25.60 kB / gzip 10.05 kB, 귀칼 렌더러는 13.61 kB / gzip 5.56 kB, 호흡 컨트롤은 1.98 kB / gzip 1.06 kB의 별도 지연 로드 청크 구성.
+
+## 탄지로 호흡 전용 검증
+
+`Auto / Water / Sun` 컨트롤은 귀칼에서만 표시. 기본 물의 다층 붓질과 별도의 반원형 회전 화염, 최근 4개 키 경로의 연결, 900ms 각성과 차분한 냉각의 실제 화면 확인. 상세 기준과 구현 경계는 [호흡 검증 기록](demon-slayer.md) 참고.
+
+- 최근 속도, 정답 비율, 콤보와 지속 시간의 동시 만족 필요. 한 번의 폭주, 붙여넣기와 키 반복, 오타 입력만으로 각성 불가. Playground는 정답 정확도가 아닌 수정 비율 기반 리듬임을 표시.
+- Chromium의 native 입력과 CDP 한글 조합에서 중간값과 중복 확정 제외. 소프트웨어 입력은 가짜 물리 눌림 없이 Space 주변의 한 번의 반응으로 표시.
+- 수동 전환 시 텍스트, 선택, 단일 canvas, 23% 볼륨 유지. 컨트롤의 Enter는 타건 수에 미반영. 실제 게임의 정확한 문자 수, 오타, 결과와 Ghost 보존.
+- 모션 감소와 효과 끄기에서도 동일한 입력으로 자동 Sun 도달 및 정답 수 유지, 전환 geometry와 입자 억제.
+- 6개 기존 viewport 모두 컨트롤, canvas와 footer의 비중첩, 가로 넘침 없음, 보수적 3D 경계, 44px 이상 모드 버튼 확인. 320px 세로 및 844px 가로 포함.
+- 고정 풀에서 2,000회 검격 요청에도 같은 geometry UUID 유지. 전환 중 재요청으로 메시나 대기열 추가 없음.
+- 24 / 44.1 / 48kHz 합성 파형의 유한 값과 피크 및 길이 상한, 2,000회 혼합 요청의 16채널 및 32소스 상한, 900ms 내 각성음 중복 억제 확인. AudioContext 재생성 시 전환음 제한 시계의 초기화도 확인.
+
+최종 Water, Sun, 각성, 냉각 및 모바일 캡처는 `artifacts/breath/`, 무음 브라우저 동작 영상은 `typing-breath.webm`, 9초 합성 소스 비교는 `sound-comparison.wav`. 참고 이미지의 직접 대조와 실기기 및 직접 청취 검증은 아래 미확인 범위에 포함.
 
 ## 기능 검증
 
@@ -69,13 +83,19 @@
 | 전체 14개 테마 10회 순환 | 전환별 입력과 잔향 소멸 확인, 총 140회 전환 | 두 번째 순환 워밍업 이후 테마별 geometry / texture 수 동일, 프로그램 수 지속 증가 없음 |
 | Inferno Challenge, DPR 2, 기본 콤보 | 가짜 시계 없이 실제 30초, native 자동 타이핑 917자 | 오타 0, 완료 시각 30,000ms, 약 59.95fps, 결과 저장 정상 |
 | Playground / Challenge 20회 왕복 | 보상 객체 생성과 정리 | 워밍업 후 geometry / texture / 프로그램 수 동일, Playground에서 보상 객체 없음 |
+| 귀칼 Water, 1440×900, DPR 2, 사운드 23% | 실제 30.02초, native 자동 타이핑 988자 | 60.03fps, P95 최대 16.8ms, 누락과 눌림 고착 없음 |
+| 귀칼 Sun, 동일 조건 | 실제 30.00초, native 자동 타이핑 990자 | 59.99fps, P95 최대 16.8ms, 누락과 눌림 고착 없음 |
+| 귀칼과 Studio 20회 왕복 | 동일한 Water 워밍업 후 GPU 객체 비교 | geometry / texture / 프로그램 수 고정, 오류 0개 |
+
+호흡 측정에서는 고정 풀의 최초 WebGL 등록을 워밍업으로 분리. 이후 Water는 geometry 113개 / texture 4개, Sun은 geometry 115개 / texture 4개로 각각 고정. 서로 다른 상태의 최초 표시 객체 수를 누수로 오인하지 않도록 같은 상태의 동일한 워밍업 이후 비교. 고속 입력 중 관찰된 활성 음성 최대치는 Water 11개, Sun 10개이며 강제 폭주 상한은 별도 단위 검사로 확인.
 
 관련 원본:
 
 - `artifacts/performance/materials-report.json`: 테마별 품질, FPS, P95, GPU, draw call과 리소스 수.
 - `artifacts/performance/stress-report.json`: 초당 샘플 60개와 전체 140회 전환 기록.
-- `playwright-report/index.html`: 전체 58개 결과. 재현은 `npm run test:e2e` 실행.
+- `playwright-report/index.html`: 전체 72개 결과. 재현은 `npm run test:e2e` 실행.
 - `artifacts/production/report.json`: 프로덕션 빌드 스모크 검사 결과.
+- `artifacts/breath/performance.json`: 상태별 실제 30초 입력과 20회 왕복의 품질, P95, 자원 및 음성 관찰값.
 
 `renderer.info.memory`와 셰이더 프로그램 수는 GPU 객체 수의 관찰값이며 GPU 메모리 바이트나 JavaScript heap 전수 분석 결과가 아님. 프레임 시간은 RAF 간격으로 측정하며 정적인 클래식의 유휴 정지는 별도 기능 검사.
 
@@ -88,6 +108,7 @@
 - WebKit / Firefox: 미검증. 실패 모듈의 URL을 오류에 포함하지 않는 브라우저의 동적 import 재시도에는 제한 가능성.
 - 성능 기준은 현재 Mac의 Chrome 결과. 다른 기기의 60fps 또는 30fps를 보장하는 결과는 아님.
 - 운영 주소 접속 확인은 위 로컬 기능 및 부하 측정과 별도 범위.
+- 소프트웨어 code가 없는 문자의 특정 물리 키 위치 추정, 화면공간 배경 굴절형 열 왜곡은 구현 범위에서 제외. 원작 장면의 정확한 재현이나 직접 청취로 조정한 믹싱 품질을 보장하는 결과가 아닌 상태.
 
 ## 재현
 

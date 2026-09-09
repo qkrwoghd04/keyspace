@@ -62,4 +62,21 @@ describe('bounded optional audio engine', () => {
     sound.setEnabled(true); sound.dispose(); sound.setEnabled(true); sound.play('KeyA');
     expect(sound.diagnostics()).toMatchObject({ voices: 1, buffers: 6 });
   });
+
+  it('keeps breathing silent when muted and deduplicates transition bursts in the same voice pool', () => {
+    sound.setProfile('demon-slayer'); sound.setBreathMode('sun'); sound.playBreathTransition();
+    expect(sound.diagnostics()).toMatchObject({ state: 'not-created', sources: 0, buffers: 0 });
+    sound.setEnabled(true); sound.setVolume(.23);
+    for (let i = 0; i < 2000; i++) sound.playBreathTransition();
+    expect(sound.diagnostics()).toMatchObject({ sources: 1, voices: 1, buffers: 7, volume: .23, breath: 'sun' });
+    sound.setBreathMode('water'); expect(sound.diagnostics().buffers).toBe(13);
+    for (let i = 0; i < 2000; i++) { sound.setBreathMode(i % 2 ? 'sun' : 'water'); sound.play('KeyA'); }
+    expect(sound.diagnostics().voices).toBeLessThanOrEqual(16);
+    expect(sound.diagnostics().sources).toBeLessThanOrEqual(32);
+    expect(sound.diagnostics().buffers).toBe(13);
+    sound.setHidden(true); sound.playBreathTransition();
+    expect(sound.diagnostics()).toMatchObject({ sources: 0, state: 'suspended', volume: .23 });
+    sound.dispose(); sound.setHidden(false); sound.setEnabled(true); sound.playBreathTransition();
+    expect(sound.diagnostics()).toMatchObject({ sources: 1, voices: 1 });
+  });
 });

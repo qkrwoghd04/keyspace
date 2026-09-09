@@ -27,6 +27,12 @@ try {
   }
   const thumbnails = await page.locator('.collection-sidebar img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0));
   expect(thumbnails).toBe(true);
+  await page.locator('.collection-sidebar [data-theme="demon-slayer"]').click();
+  await expect(page.locator('.breath-controls')).toHaveAttribute('data-breath', 'water');
+  await page.getByRole('button', { name: 'Breath sun', exact: true }).click();
+  await expect(page.locator('.breath-controls')).toHaveAttribute('data-breath', 'sun');
+  await expect(page.locator('#typing-space')).toHaveValue('Production preview. 한글');
+  await page.getByRole('button', { name: 'Breath auto', exact: true }).click();
   await page.getByRole('button', { name: 'Reset typed text' }).click();
   await page.locator('#typing-space').focus();
   await page.keyboard.type('Build verified.');
@@ -49,12 +55,20 @@ try {
   await expect(page.locator('#challenge-input')).toHaveValue('A');
   await expect(page.getByRole('progressbar', { name: 'Ghost progress', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '경기 취소', exact: true }).click();
+  await page.getByRole('button', { name: '다시 도전', exact: true }).click();
+  await page.clock.runFor(3100);
+  const passage = (await page.locator('.race-passage').getAttribute('aria-label')).slice('지문: '.length, '지문: '.length + 66);
+  for (const char of passage) { await page.keyboard.type(char); await page.clock.runFor(100); }
+  await expect(page.locator('.breath-controls')).toHaveAttribute('data-breath', 'sun');
+  await page.clock.fastForward(30000);
+  await expect(page.getByTestId('race-speed')).toHaveText('26.4');
+  await expect(page.getByTestId('race-accuracy')).toHaveText('100.0%');
   await page.getByRole('button', { name: 'Playground', exact: true }).click();
   await expect(page.locator('#typing-space')).toHaveValue('Build verified.\nReady');
   expect(errors).toEqual([]);
   await mkdir('artifacts/production', { recursive: true });
   await page.screenshot({ path: 'artifacts/production/orbit.png' });
-  const report = { base, themes: themes.length, oneCanvas: true, debugApiAbsent: true, challengeDebugApiAbsent: true, challengeTimedResult: true, challengeSavedGhost: true, textRetained: true, nativeTyping: true, thumbnails, failedChunkRetry: true, errors };
+  const report = { base, themes: themes.length, oneCanvas: true, debugApiAbsent: true, challengeDebugApiAbsent: true, challengeTimedResult: true, challengeSavedGhost: true, breathManual: true, breathAutomatic: true, breathScoreUnchanged: true, textRetained: true, nativeTyping: true, thumbnails, failedChunkRetry: true, errors };
   await writeFile('artifacts/production/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 } finally { await browser.close(); }

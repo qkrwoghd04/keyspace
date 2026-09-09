@@ -47,8 +47,8 @@ export const THEMES: readonly ThemeDefinition[] = [
     load: loadTheme(() => import('./orbit')),
   },
   {
-    id: 'demon-slayer', name: '귀멸의 칼날', category: 'ANIMATION', material: 'Water breathing / lacquer',
-    thumbnail: `${import.meta.env.BASE_URL}themes/demon-slayer.png`, colorScheme: 'light', swatches: ['#244e3e', '#b9d8c7', '#26899b'], appearance: ANIMATION_APPEARANCES['demon-slayer'],
+    id: 'demon-slayer', name: '귀멸의 칼날', category: 'ANIMATION', material: 'Tanjiro / Water into Sun',
+    thumbnail: `${import.meta.env.BASE_URL}themes/demon-slayer.png`, colorScheme: 'light', swatches: ['#173e42', '#e0eced', '#247b9f'], appearance: ANIMATION_APPEARANCES['demon-slayer'],
     load: loadTheme(() => import('./animation/demon-slayer')),
   },
   {

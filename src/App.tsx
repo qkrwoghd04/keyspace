@@ -7,8 +7,10 @@ import { ChallengeChannel } from './challenge/ChallengeChannel';
 import type { ChallengeHandle } from './challenge/Challenge';
 import { DEFAULT_THEME } from './themes/registry';
 import type { ThemeDefinition } from './themes/types';
+import { BreathController } from './themes/demon-slayer/BreathController';
 
 const Challenge = lazy(() => import('./challenge/Challenge'));
+const BreathControls = lazy(() => import('./themes/demon-slayer/BreathControls'));
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -56,6 +58,7 @@ export default function App() {
   const [mode, setMode] = useState<'playground' | 'challenge'>('playground');
   const [raceLocked, setRaceLocked] = useState(false);
   const [challengeChannel] = useState(() => new ChallengeChannel());
+  const [breath] = useState(() => new BreathController(input));
   const [challengeLoaded, setChallengeLoaded] = useState(false);
   const challenge = useRef<ChallengeHandle>(null);
   const preset = activeTheme.appearance;
@@ -77,6 +80,8 @@ export default function App() {
   } as CSSProperties;
 
   useEffect(() => input.connect(), [input]);
+  useEffect(() => breath.connect(challengeChannel), [breath, challengeChannel]);
+  useEffect(() => breath.setActive(activeTheme.id === 'demon-slayer'), [activeTheme.id, breath]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -107,12 +112,14 @@ export default function App() {
     if (!textarea || composing.current) return;
     if (!editVirtualKey(textarea, code, input.pressed)) return;
     setText(textarea.value);
+    breath.observeText(textarea.value, code === 'Backspace' || code === 'Delete' ? 'deleteContentBackward' : 'insertText');
     setResetMessage('');
-  }, [input, mode]);
+  }, [input, mode, breath]);
 
   const reset = () => {
     setText('');
     input.releaseAll();
+    breath.observeText('', 'historyUndo'); breath.reset();
     setResetMessage('Text cleared.');
   };
 
@@ -162,9 +169,11 @@ export default function App() {
               data-keyboard-input
               ref={editor}
               value={text}
-              onChange={event => { setText(event.currentTarget.value); setResetMessage(''); }}
-              onCompositionStart={() => { composing.current = true; }}
-              onCompositionEnd={() => { composing.current = false; }}
+              onChange={event => { setText(event.currentTarget.value); setResetMessage(''); const native = event.nativeEvent as InputEvent; breath.observeText(event.currentTarget.value, native.inputType, native.isComposing); }}
+              onCompositionStart={() => { composing.current = true; breath.beginComposition(); }}
+              onCompositionEnd={event => { composing.current = false; breath.endComposition(event.currentTarget.value); }}
+              onKeyDown={event => breath.observeRepeat(event.repeat)}
+              onKeyUp={() => breath.observeRepeat(false)}
               onFocus={() => setFocused(true)}
               onBlur={() => { setFocused(false); composing.current = false; }}
               placeholder="Start typing."
@@ -185,7 +194,8 @@ export default function App() {
         {challengeLoaded ? <div className="challenge-slot" hidden={mode !== 'challenge'}><Suspense fallback={<p className="challenge-loading" role="status">Challenge 준비 중…</p>}><Challenge ref={challenge} input={input} channel={challengeChannel} enabled={mode === 'challenge'} themeReady={!themeError && activeTheme.id === requestedTheme.id} onLockChange={setRaceLocked} /></Suspense></div> : null}
 
         <div className="keyboard-stage">
-          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} theme={requestedTheme} onThemeReady={themeReady} onThemeError={themeFailed} challengeChannel={challengeChannel} />
+          {activeTheme.id === 'demon-slayer' ? <Suspense fallback={null}><BreathControls controller={breath} /></Suspense> : null}
+          <KeyboardScene input={input} reducedMotion={reducedMotion} onVirtualKey={onVirtualKey} theme={requestedTheme} onThemeReady={themeReady} onThemeError={themeFailed} challengeChannel={challengeChannel} breath={breath} />
           <div className="theme-status" role="status" aria-live="polite" data-keyboard-controls>
             {themeError ? <>{themeError}<button type="button" onClick={() => { setThemeError(''); setRequestedTheme({ ...requestedTheme }); }}>Try again</button></> : requestedTheme.id !== activeTheme.id ? `Preparing ${requestedTheme.name}…` : null}
           </div>

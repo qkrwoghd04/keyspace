@@ -10,14 +10,16 @@ try {
   await catalogPage.goto('http://127.0.0.1:5180');
   const themes = await catalogPage.locator('.collection-sidebar [data-theme]').evaluateAll(buttons => buttons.map(button => ({ id: button.dataset.theme, name: button.getAttribute('aria-label'), category: button.closest('section').getAttribute('aria-label') })));
   await catalogPage.close();
-  for (const { id, name } of themes) {
+  const selected = process.env.THEME_ID ? themes.filter(theme => theme.id === process.env.THEME_ID) : themes;
+  if (!selected.length) throw new Error('Unknown THEME_ID');
+  for (const { id, name } of selected) {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.route('**/themes/*.png', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>' }));
     await page.goto('http://127.0.0.1:5180');
     await page.getByRole('button', { name, exact: true }).click();
     await page.waitForFunction(id => document.querySelector('.keyspace')?.getAttribute('data-preset') === id && !!window.__keyspace, id);
     // Thumbnail capture only: isolate the actual renderer and give it a fixed frame.
-    await page.addStyleTag({ content: '.keyspace{display:block!important}.collection-sidebar,.site-header,.site-footer,.thoughts,.mode-switch,.theme-status{display:none!important}.main-room,.playground{display:block!important;min-height:0!important;height:228px!important}.keyboard-stage,.keyboard-scene{width:336px!important;height:228px!important;min-height:0!important}' });
+    await page.addStyleTag({ content: '.keyspace{display:block!important}.collection-sidebar,.site-header,.site-footer,.thoughts,.mode-switch,.theme-status,.breath-controls{display:none!important}.main-room,.playground{display:block!important;min-height:0!important;height:228px!important}.keyboard-stage,.keyboard-scene{display:block!important;width:336px!important;height:228px!important;min-height:0!important}' });
     await page.setViewportSize({ width: 336, height: 228 });
     await page.waitForTimeout(650);
     await page.screenshot({ path: `public/themes/${id}.png` });

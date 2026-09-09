@@ -47,8 +47,11 @@ export class ChallengeRewards {
   private bursts = 0;
   private finales = 0;
   private readonly top: number;
+  private readonly native: boolean;
 
   constructor(theme: ThemeId, model: ThemeRuntime, quality: QualitySettings) {
+    this.native = model.nativeChallengeEffects === true;
+    this.group.visible = !this.native;
     this.profile = PROFILES[theme]; this.quality = quality;
     this.group.name = `${theme} / judgment rewards`;
     model.group.updateMatrixWorld(true);
@@ -62,9 +65,9 @@ export class ChallengeRewards {
     const { style, color } = this.profile;
     const geometry = style === 'bloom' ? blossom() : style === 'jelly' || style === 'steam' ? new THREE.SphereGeometry(1, 8, 6) : style === 'print' || style === 'mechanical' ? new THREE.BoxGeometry(.8, .15, 1.4) : new THREE.OctahedronGeometry(1, 0);
     const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: style === 'steam' ? .35 : .8, depthWrite: false, toneMapped: false });
-    this.particles = new ParticlePool(this.group, 64, geometry, material, style === 'steam' ? .3 : style === 'orbit' ? 0 : -1.6, 2);
-    this.ribbons = new RibbonPool(this.group, 6);
-    this.waves = new WavePool(this.group, 3, color, .65);
+    this.particles = new ParticlePool(this.group, this.native ? 1 : 64, geometry, material, style === 'steam' ? .3 : style === 'orbit' ? 0 : -1.6, 2);
+    this.ribbons = new RibbonPool(this.group, this.native ? 1 : 6);
+    this.waves = new WavePool(this.group, this.native ? 1 : 3, color, .65);
     this.halo = new THREE.Mesh(new THREE.RingGeometry(.993, 1, 96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
     this.halo.rotation.x = -Math.PI / 2; this.halo.position.set(0, this.top - .08, 0); this.halo.scale.set(8.25, 3.3, 1); this.halo.visible = false; this.group.add(this.halo);
     model.group.add(this.group); this.setQuality(quality);
@@ -80,6 +83,7 @@ export class ChallengeRewards {
     if (event.type === 'finished') {
       if (this.finale > 0) return false;
       this.finale = 1.4; this.finales++;
+      if (this.native) return true;
       const count = strong && this.quality.level === 'standard' ? 10 : 4;
       for (const x of [-6.6, 0, 6.6]) this.particles.burst(x, this.top, 2.85, count, .7, 1.7, this.profile.style === 'bloom' ? .19 : .075);
       this.ribbons.emit({ x: -8, y: this.top, z: 3.05 }, { x: 8, y: this.top, z: 3.05 }, this.profile.color, .035 * scale, .23, 1.1, this.profile.style === 'print', -.45);
@@ -93,6 +97,7 @@ export class ChallengeRewards {
     const point = this.points.get(event.code ?? '') ?? this.points.get('Space');
     if (!point) return false;
     this.cooldown = strong ? .035 : .075; this.bursts++;
+    if (this.native) return true;
     const { style, color, secondary } = this.profile, tier = event.tier;
     const count = style === 'bloom' && tier >= 2 ? 2 : 1 + Math.min(3, tier);
     const size = (style === 'bloom' && tier >= 2 ? .13 : style === 'steam' ? .09 : .035) * scale;
@@ -109,6 +114,7 @@ export class ChallengeRewards {
   update(delta: number, reduced: boolean) {
     this.cooldown = Math.max(0, this.cooldown - delta); this.finale = Math.max(0, this.finale - delta);
     if (reduced || this.intensity === 'off') { this.clear(); return false; }
+    if (this.native) return this.finale > 0;
     const a = this.particles.update(delta), b = this.ribbons.update(delta), c = this.waves.update(delta);
     this.halo.visible = this.profile.style === 'orbit' && (this.tier >= 3 || this.finale > 0);
     this.halo.material.opacity = this.intensity === 'full' ? .42 : .2;
