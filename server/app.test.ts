@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from './app';
@@ -139,6 +139,27 @@ describe('server-owned Challenge records', () => {
       expect((await current.app.inject({ url: '/api/records?choice=english', headers: { cookie } })).json().items[0].id).toBe(id);
     }
     expect(restored.store.db.pragma('integrity_check', { simple: true })).toBe('ok');
+  });
+  it('rate limits the API but never the static site', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'keyspace-static-')); directories.push(root);
+    writeFileSync(join(root, 'index.html'), '<!doctype html>');
+    const { app } = await createApp({ databasePath: ':memory:', origins: ['https://keyspace.test'], staticRoot: root, globalRateLimit: 2 });
+    closes.push(() => app.close());
+    const pages = [], api = [];
+    for (let i = 0; i < 4; i++) pages.push((await app.inject({ url: '/' })).statusCode);
+    for (let i = 0; i < 3; i++) api.push((await app.inject({ url: '/api/health' })).statusCode);
+    expect(pages).toEqual([200, 200, 200, 200]);
+    expect(api).toEqual([200, 200, 429]);
+  });
+  it('keys limits by the forwarded client address only behind a trusted proxy', async () => {
+    const make = async (trustProxy?: string[]) => {
+      const { app } = await createApp({ databasePath: ':memory:', origins: ['https://keyspace.test'], globalRateLimit: 1, trustProxy });
+      closes.push(() => app.close());
+      const hit = (client: string) => app.inject({ url: '/api/health', remoteAddress: '10.0.1.2', headers: { 'x-forwarded-for': client } }).then(response => response.statusCode);
+      return [await hit('203.0.113.1'), await hit('203.0.113.2')];
+    };
+    expect(await make(['10.0.1.0/24'])).toEqual([200, 200]);
+    expect(await make()).toEqual([200, 429]);
   });
   it('limits repeated starts by participant without imposing a tiny shared-IP limit', async () => {
     const { app, user } = await setup(':memory:', true); const { cookie } = await user();

@@ -11,14 +11,15 @@ const COOKIE = 'keyspace_player';
 const choiceSchema = { type: 'string', enum: ['korean', 'english'] };
 const pageSchema = { type: 'object', additionalProperties: false, properties: { choice: choiceSchema, offset: { type: 'integer', minimum: 0, maximum: 100_000, default: 0 } }, required: ['choice'] };
 const idSchema = { type: 'object', additionalProperties: false, properties: { id: { type: 'string', pattern: '^[a-f0-9-]{36}$' } }, required: ['id'] };
-export interface AppOptions { databasePath: string; origins: string[]; secureCookies?: boolean; staticRoot?: string; now?: () => number; logger?: boolean; trustProxy?: string[]; rateLimits?: boolean }
+export interface AppOptions { databasePath: string; origins: string[]; secureCookies?: boolean; staticRoot?: string; now?: () => number; logger?: boolean; trustProxy?: string[]; rateLimits?: boolean; globalRateLimit?: number }
 
 export async function createApp(options: AppOptions) {
   const now = options.now ?? Date.now, store = new RecordStore(options.databasePath);
   // Never log cookies, bodies or query strings containing input data.
   const app = Fastify({ logger: options.logger ? { serializers: { req: req => ({ method: req.method, url: req.url?.split('?')[0] }) }, redact: ['req.headers.cookie', 'res.headers.set-cookie'] } : false, bodyLimit: 262_144, trustProxy: options.trustProxy ?? false, ajv: { customOptions: { removeAdditional: false } } });
   await app.register(cookie);
-  await app.register(rateLimit, { global: options.rateLimits !== false, max: 6000, timeWindow: 60_000, cache: 10_000, errorResponseBuilder: () => ({ statusCode: 429, message: '요청이 많음. 잠시 후 다시 시도해 주세요.' }) });
+  // Static files are immutable and cached; limiting them only lets an API burst blank the page for everyone.
+  await app.register(rateLimit, { global: options.rateLimits !== false, max: options.globalRateLimit ?? 6000, timeWindow: 60_000, cache: 10_000, allowList: request => !request.url.startsWith('/api/'), errorResponseBuilder: () => ({ statusCode: 429, message: '요청이 많음. 잠시 후 다시 시도해 주세요.' }) });
   const player = (request: FastifyRequest) => store.player(request.cookies[COOKIE]);
   const requirePlayer = (request: FastifyRequest) => { const current = player(request); if (!current) throw new HttpError(401, '닉네임을 다시 등록해 주세요.'); return current; };
   const playerKey = (request: FastifyRequest) => tokenHash(request.cookies[COOKIE] ?? request.ip);
