@@ -1,33 +1,69 @@
 # 14개 키보드 컬렉션과 Challenge 검증
 
-검증일: 2026-09-09. 아래 기능과 부하 수치는 로컬 자동 검증 결과이며 운영 환경의 실기기 성능 보장과는 구분.
+검증 갱신: 2026-09-23. 30초 서버 Challenge 구현 후 전체 회귀와 API 부하 검사. 아래 결과는 로컬 검증이며 운영 서버의 실제 트래픽/네트워크와 실기기 성능 보장과는 구분. 운영 사이트 전환 미실행.
 
 ## 실행 환경과 결과
 
 - Node.js 24.14.1, npm 11.11.0, Vite 7.3.6, Three.js 0.180.0.
-- macOS, Google Chrome 152의 headless 모드, 실제 WebGL2 사용.
+- macOS, Google Chrome 154의 headless 모드, 실제 WebGL2 사용. 기존 2026-09-09 측정은 Chrome 152.
 - GPU 문자열: `ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)`.
-- TypeScript 검사, Vitest 78개 통과. 기존 73개에 지속형 경로의 입력 순서, 수명, 공백 분리, 좌표 보간 및 고정 GPU 버퍼 검사 5개 추가.
-- Playwright 기존 입력 및 화면 회귀 44개, Challenge 13개, 호흡 전용 17개, 60초 부하 및 140회 전환 검사 1개 통과. 전체 75개 실행 시간 5.8분.
-- 신규 ANIMATION 전용 검사 19개 포함. 기존 Inferno / Jelly 및 native 편집 회귀도 같은 전체 실행에서 통과.
-- Challenge의 한글 조합, 규칙, 저장 실패, Ghost와 검증 한계는 [별도 검증 문서](challenge.md) 참고. Playground 개인 문장 저장 없음, 브라우저 저장소는 Challenge 최소 결과와 이력에 한정.
-- 빌드된 로컬 프로덕션 미리보기에서 14개 전환, 단일 canvas, 문장 보존, native 편집, 정적 썸네일과 실패 청크 재시도 통과. Challenge의 30초 결과, 저장, 실제 Ghost 선택과 재도전 포커스 및 Playground 복귀 확인. Water/Sun 수동 전환과 Auto 각성 후 66자 정답 및 26.4 WPM 결과까지 확인. 두 개발 전용 진단 API 제외와 처리되지 않은 브라우저 오류 0개 확인.
-- Three.js vendor chunk 533.46 kB / gzip 135.37 kB에 대한 Vite 크기 경고 잔존. 오류는 아니며 기존 확장 모델 6개와 애니메이션 모델 5개는 개별 지연 로드 청크로 분리. Challenge는 25.60 kB / gzip 10.04 kB, 귀칼 렌더러는 21.46 kB / gzip 8.25 kB, 호흡 컨트롤은 1.98 kB / gzip 1.06 kB의 별도 지연 로드 청크 구성.
+- TypeScript 검사, 프로덕션 빌드, Vitest 65개 통과. 공유 판정과 서버 13개 검사, 저장 실패 롤백, 동점 순위와 버전 분리 포함.
+- 전체 Playwright 60개 통과, 약 4.2분. 새 Challenge 11개와 디지몬 4개, 기존 공통 입력/IME/14개 테마/장시간 회귀 포함.
+- 한글 조합 중간값/취소/중복 확정, 삭제/재입력, 30초 경계, 취소/탭 이탈, 저장 응답 유실 후 같은 경기 재시도 통과.
+- Chrome 154.0.8037.45와 Firefox 155.0의 별도 프로세스에서 실제 30초 경기 각각 1회, 서버 저장과 공용 순위 공유, 서로 다른 개인 이력 확인.
+- 프로덕션 화면에서 14개 전환, 단일 canvas, native 편집과 문장 보존, 정적 썸네일, 실패 청크 재시도 통과. 개발 전용 진단 API 두 개 제외, 브라우저 오류 0개.
+- Challenge의 서버 규칙과 개인정보 경계는 [별도 문서](challenge.md) 참고. Playground 입력 전송 없음. 이전 브라우저 기록은 미이전/미삭제.
+- Three.js vendor chunk 533.46 kB / gzip 135.37 kB의 기존 크기 경고 잔존. 코드 분할된 렌더러와 Challenge 유지.
 
-## 탄지로 호흡 전용 검증
+## 100명 동시 접속과 저장 실측
 
-`Auto / Water / Sun` 컨트롤은 귀칼에서만 표시. 최근 10개 키를 잇는 다층 수류와 선두 회전형 화염, 900ms 각성과 차분한 냉각의 실제 화면 확인. 지속형 경로는 저품질 및 낮은 효과에서 6개로 축소. 상세 기준과 구현 경계는 [호흡 검증 기록](demon-slayer.md) 참고.
+2026-09-23 로컬 Docker Desktop, Linux arm64 Node 24.14.1, SQLite 3.53.4 WAL, CPU 2개 / 메모리 1GiB 제한. 다른 기능 검증과 같은 M5 Pro 호스트 사용. 외부 네트워크 RTT와 운영 서버 부하는 미포함.
 
-- 최근 속도, 정답 비율, 콤보와 지속 시간의 동시 만족 필요. 한 번의 폭주, 붙여넣기와 키 반복, 오타 입력만으로 각성 불가. Playground는 정답 정확도가 아닌 수정 비율 기반 리듬임을 표시.
-- Chromium의 native 입력과 CDP 한글 조합에서 중간값과 중복 확정 제외. 소프트웨어 입력은 가짜 물리 눌림 없이 Space 주변의 한 번의 반응으로 표시.
-- 수동 전환 시 텍스트, 선택, 단일 canvas, 23% 볼륨 유지. 컨트롤의 Enter는 타건 수에 미반영. 실제 게임의 정확한 문자 수, 오타, 결과와 Ghost 보존.
-- 모션 감소와 효과 끄기에서도 동일한 입력으로 자동 Sun 도달 및 정답 수 유지, 전환 geometry와 입자 억제.
-- 6개 기존 viewport 모두 컨트롤, canvas와 footer의 비중첩, 가로 넘침 없음, 보수적 3D 경계, 44px 이상 모드 버튼 확인. 320px 세로 및 844px 가로 포함.
-- 고정 풀에서 2,000회 검격 요청에도 같은 geometry UUID 유지. 전환 중 재요청으로 메시나 대기열 추가 없음.
-- 새 경로 검사에서 먼 키 10개를 누락 없이 연결, Water와 Sun의 실제 GPU 정점이 모든 키 중심에 오차 0.001 모델 단위 미만으로 일치. 같은 프레임의 10개 입력 보존, 반복 hold와 소프트웨어 확정의 가짜 경로 제외, 낮은 Challenge 효과에서도 정답 12개의 연출 전달 누락 없음.
-- 24 / 44.1 / 48kHz 합성 파형의 유한 값과 피크 및 길이 상한, 2,000회 혼합 요청의 16채널 및 32소스 상한, 900ms 내 각성음 중복 억제 확인. AudioContext 재생성 시 전환음 제한 시계의 초기화도 확인.
+| 항목 | 실측 |
+| --- | --- |
+| 동시 참가자 | 100명, 한국어 50명 / 영어 50명, 각각 별도 쿠키 |
+| 검사 시간 | 600.02초 |
+| 반복 경기 | 참가자당 17회, 총 1,700개. 실제 3초 준비 + 30초 대기, 시간 가속 없음 |
+| 동시 제출 / 재시도 | 매 회 100건 동시 제출 후 100건 재전송, 제출 요청 총 3,400건 |
+| 전체 API 요청 | 10,400건 |
+| 전체 응답 P95 / 최대 | 130.11ms / 405.90ms |
+| 결과 제출 P95 | 177.48ms |
+| 순위 조회 P95 | 56.28ms |
+| 개인 이력 조회 P95 | 45.67ms |
+| 경기 시작 P95 | 121.61ms |
+| 기록 유실 / 중복 | 0건 / 0건 |
+| 서버/API 오류 | 0건 |
+| 기준 | 오류/유실/중복 0건, P95 500ms 이하 통과 |
 
-지속형 경로 개선 전후 화면과 무음 영상은 `artifacts/flow/before/` 및 `artifacts/flow/after/typing.webm`. 같은 홈 행, 교차, 저속 및 모바일 입력으로 비교. before는 기존 운영 화면의 읽기 전용 캡처, after는 새 로컬 구현이며 신규 배포와 구분. 앞선 각성 및 냉각 캡처와 9초 합성 소스 비교는 `artifacts/breath/`에 보관. 참고 이미지의 직접 대조와 실기기 및 직접 청취 검증은 아래 미확인 범위에 포함.
+매 회 개인 이력에서 직전 경기 확인, 종료 시 모든 참가자의 전체 이력 ID 대조. 마지막 온전한 경기 이후 남은 시간 대기 후 최종 조회. 합성 API 참가자 부하이며 100개 브라우저의 GPU 부하를 뜻하지 않는 범위. 검사 중 한 시점 RSS 관찰값 약 122MiB, 최대 RSS를 지속 샘플링한 수치는 아님.
+
+`artifacts/challenge/load-report.json`에 요청 수와 경로별 지연 분포 보관. `scripts/load-challenge.ts`로 재현.
+
+## 영구 저장과 복원 실측
+
+부하 검사 종료 후 참가자 100명, 경기와 결과 각각 1,700개가 있는 DB 사용.
+
+- 서버 프로세스를 포함한 컨테이너 재시작 후 전체 행 수와 SHA-256 데이터 지문 일치.
+- 기존 컨테이너를 새로 생성하고 동일 영구 볼륨 연결 후 전체 데이터 지문 일치.
+- 실행 중 SQLite online backup 생성 후 새 볼륨으로 복원, 별도 컨테이너 시작 성공.
+- 복원 후 전체 행 수와 데이터 지문 일치, 한국어/영어 순위 응답 일치.
+- 원본/재시작/재생성/복원 DB 모두 integrity_check = ok, foreign_key_check 오류 0개, WAL 활성화.
+- 쿠키 소유권 보존은 서버 단위 검사에서 DB 재연결 및 백업 파일 복원 후 확인.
+
+`artifacts/challenge/storage-report.json`에 비교 결과 보관. `scripts/verify-storage.mjs`는 지정된 로컬 capacity 테스트 컨테이너에만 적용. 원본 볼륨을 덮어쓰거나 삭제하지 않으며 복원용 볼륨 별도 생성. 운영 절차는 [배포 준비](deployment.md) 참고.
+
+## 디지몬 교체 검증
+
+귀멸의 칼날 목록, 전용 호흡 UI, 런타임 및 사운드 연결 제거. 전체 14개 컬렉션 유지. 구조는 [디지몬 테마](digimon.md) 참고.
+
+- 실제 Enter 입력으로 아구몬 → 그레이몬 → 메탈그레이몬 → 워그레이몬 순차 진화 확인. 그레이몬 8.5초 및 최종 단계 20초 후에도 유지, 최종 단계의 추가 Enter에서 되감기 없음.
+- Space 화염, 쌍발 미사일, 에너지 구체와 native 줄바꿈 및 공백 보존. 단위 검사에서 전 단계 기술 실행 전후 geometry UUID 목록 동일.
+- reset으로 진화 및 입자 정리. Chromium CDP 한글 조합에서 가짜 물리 패킷 생성 없음.
+- Challenge에서 14개 테마 모두 입자와 대표 연출 0개 확인. 디지몬은 아구몬 정적 모습과 키 눌림 유지, 정답 12자 = 0.40글자/초. Playground의 워그레이몬 진화 유지.
+- 기존 6개 viewport에서 최종 단계와 에너지 구체의 보수적 모델 경계 및 가로 넘침 확인. 공통 모바일 시트 포커스 검사 유지. 2,000회 대표 연출 요청의 시작 1회와 대기열 0개 검사 통과.
+- 단위 검사에서 2,000개 데이터 패킷 요청에도 같은 geometry 유지, 기본 48개 / 낮은 품질 18개 제한과 수명 종료 확인.
+
+새 화면과 무음 영상은 `artifacts/digimon/`, 썸네일은 `public/themes/digimon.png`에 보관. 소스, scripts, 빌드 출력에 삭제한 테마의 실행 참조 없음. 제거 확인을 위한 부정 테스트의 문자열만 유지. 이전 귀칼 구현은 Git 기록에서 복구 가능.
 
 ## 기능 검증
 
@@ -59,7 +95,7 @@
 
 | 항목 | 근거와 결과 |
 | --- | --- |
-| 입력 순서 | `jajj` 입력에서 궤적 이력이 KeyJ → KeyA → KeyJ → KeyJ 순서로 일치. 동일 키 재입력에도 길이가 있는 국소 검격 생성 |
+| 입력 순서 | `jajj` 입력에서 데이터 패킷 이력이 KeyJ → KeyA → KeyJ → KeyJ 순서로 일치 |
 | 포켓몬 동료 | 일반 키에서 동료 반응량과 시선 변화, Enter에서 몬스터볼 개방, Space에서 두 충전 궤적과 닫힌 볼 상태 확인 |
 | 만화 렌더링 | 셀 명암, 망점, 외곽선과 CMY 잔상 시각 확인. 실제 키 Y 변위는 다음 RAF에 반영, native 입력과 줄바꿈 및 삭제 유지 |
 | 살아 있는 하우징 | 일반 키에서 톱니 에너지, 창문 열기, 다리 에너지와 굴뚝 반응 확인. 연결된 굴뚝과 하부 관절의 Enter 장면 시각 확인 |
@@ -74,7 +110,7 @@
 
 ## 성능과 리소스
 
-벤치마크는 다른 Chrome 검증을 동시에 실행하지 않은 상태에서 측정. 아래 모바일 값은 휴대폰 GPU 결과가 아닌 M5 Pro에서의 모바일 에뮬레이션 결과.
+렌더링 벤치마크는 다른 Chrome 검증과 겹치지 않게 실행. 새 Challenge 및 장시간 회귀 검사 중 로컬 API 부하 검사는 병행. 아래 모바일 값은 휴대폰 GPU 결과가 아닌 M5 Pro에서의 모바일 에뮬레이션 결과.
 
 | 조건 | 범위 | 측정 결과 |
 | --- | --- | --- |
@@ -82,21 +118,25 @@
 | 모바일 390×844, 기기 DPR 3, renderer 상한 1.25, 저품질 | 동일한 14개 모델 측정 | 14개 모두 약 60fps, 프레임 P95 최대 16.8ms |
 | 데스크톱 1440×900, DPR 1, Inferno | 초당 30회 합성 키 이벤트, 60초, 총 1,800회 | 약 60fps, 입력 수 일치, 눌림 고착 없음 |
 | 전체 14개 테마 10회 순환 | 전환별 입력과 잔향 소멸 확인, 총 140회 전환 | 두 번째 순환 워밍업 이후 테마별 geometry / texture 수 동일, 프로그램 수 지속 증가 없음 |
-| Inferno Challenge, DPR 2, 기본 콤보 | 가짜 시계 없이 실제 30초, native 자동 타이핑 917자 | 오타 0, 완료 시각 30,000ms, 약 59.95fps, 결과 저장 정상 |
-| Playground / Challenge 20회 왕복 | 보상 객체 생성과 정리 | 워밍업 후 geometry / texture / 프로그램 수 동일, Playground에서 보상 객체 없음 |
-| 귀칼 Water, 1440×900, DPR 2, 사운드 23% | 실제 30.02초, native 자동 타이핑 985자 | 59.99fps, P95 최대 16.8ms, 누락과 눌림 고착 없음 |
-| 귀칼 Sun, 동일 조건 | 실제 30.01초, native 자동 타이핑 987자 | 60.02fps, P95 최대 16.8ms, 누락과 눌림 고착 없음 |
-| 귀칼과 Studio 20회 왕복 | 동일한 Water 워밍업 후 GPU 객체 비교 | geometry / texture / 프로그램 수 고정, 오류 0개 |
+| Inferno Challenge, DPR 2, 효과 없음 | 가짜 시계 없이 실제 30초, native 자동 타이핑 946자 | 오타 0, 최종 30,000ms, 31.53글자/초, 약 60.00fps, 서버 저장 정상 |
+| Playground / Challenge 20회 왕복 | 모드 전환과 기록 조회 | 워밍업 후 geometry 104 / texture 4 / 프로그램 9 고정 |
+| 최종 진화 포함 디지몬, 1440×900, DPR 2 | 실제 30초 native 자동 입력 759자, 최종 진화와 단계별 기술 포함 | 60.01fps, P95 16.8ms, 텍스트 및 물리 입력 수 일치, 오류 0개 |
+| 디지몬과 Studio 8회 왕복 | 모든 진화 단계 및 기술 워밍업 이후 비교 | geometry / texture / 프로그램 수 고정 |
 
-호흡 측정에서는 고정 풀의 최초 WebGL 등록을 워밍업으로 분리. 이후 Water는 geometry 111개 / texture 4개, Sun은 geometry 113개 / texture 4개로 각각 고정. 두 모드 모두 standard 품질 유지, 55fps 이상 및 P95 25ms 이하 기준 통과. 서로 다른 상태의 최초 표시 객체 수를 누수로 오인하지 않도록 같은 상태의 동일한 워밍업 이후 비교. 고속 입력 중 관찰된 활성 음성 최대치는 Water 11개, Sun 12개이며 강제 폭주 상한은 별도 단위 검사로 확인.
+Challenge 30초와 20회 모드 왕복, 60초/1,800회 합성 키 입력과 140회 테마 전환은 이번 변경 후 새로 실행. 장시간 검사 평균 60.005fps, 마지막 프레임 P95 16.7ms. Challenge 표본별 프레임 P95 최대 36.1ms는 초기 준비 구간 포함, 평균 약 60fps와 구분.
+
+디지몬의 30초/8회 왕복은 이전 최종 진화 확장 시점의 관찰값. 모든 테마별 짧은 개별 측정은 2026-09-09 관찰값으로 유지. 이번 전체 회귀에서 디지몬의 최종 진화, 4단계 기술, 6개 viewport는 다시 확인. 실제 휴대폰 결과와 구분.
 
 관련 원본:
 
 - `artifacts/performance/materials-report.json`: 테마별 품질, FPS, P95, GPU, draw call과 리소스 수.
 - `artifacts/performance/stress-report.json`: 초당 샘플 60개와 전체 140회 전환 기록.
-- `playwright-report/index.html`: 전체 75개 결과. 재현은 `npm run test:e2e` 실행.
-- `artifacts/production/report.json`: 프로덕션 빌드 스모크 검사 결과.
-- `artifacts/breath/performance.json`: 상태별 실제 30초 입력과 20회 왕복의 품질, P95, 자원 및 음성 관찰값.
+- `playwright-report/index.html`: 가장 최근 브라우저 실행 결과. 전체 재현은 `npm run test:e2e` 실행.
+- `artifacts/production/report.json`: Chrome/Firefox의 프로덕션 빌드 검사 결과.
+- `artifacts/challenge/performance.json`: 실제 30초 입력, 서버 저장과 모드 전환 검사.
+- `artifacts/challenge/load-report.json`, `storage-report.json`: API 부하와 영구 저장 검증.
+- `artifacts/challenge/preview-1440.png`, `preview-390.png`, `preview-320.png`: 최신 공용 순위 화면.
+- `artifacts/digimon/performance.json`: 실제 30초 디지몬 입력과 8회 왕복의 품질, P95 및 리소스 관찰값.
 
 `renderer.info.memory`와 셰이더 프로그램 수는 GPU 객체 수의 관찰값이며 GPU 메모리 바이트나 JavaScript heap 전수 분석 결과가 아님. 프레임 시간은 RAF 간격으로 측정하며 정적인 클래식의 유휴 정지는 별도 기능 검사.
 
@@ -106,10 +146,10 @@
 - 실제 iOS / Android 기기, 소프트웨어 키보드, 열 제한과 저사양 GPU: 직접 검증 미실시.
 - 실제 OS 창 전환: 자동 blur / visibility 이벤트 정리 검사와 구분, 직접 수동 검증 미실시.
 - 사운드 직접 청취: 미실시. 14개 합성 파형의 유한 값, 최대 길이, 프로필 차이와 엔진 상태만 검증. 25.2초 청취용 `artifacts/audio/material-comparison.wav`와 테마별 시작 시각의 `timeline.json` 제공.
-- WebKit / Firefox: 미검증. 실패 모듈의 URL을 오류에 포함하지 않는 브라우저의 동적 import 재시도에는 제한 가능성.
+- WebKit: 미검증. Firefox는 실제 경기/저장/순위/개인 이력만 확인, 테마 전체와 IME 전수 검사는 Chrome 범위. 오류 URL을 제공하지 않는 브라우저의 동적 import 재시도에는 제한 가능성.
 - 성능 기준은 현재 Mac의 Chrome 결과. 다른 기기의 60fps 또는 30fps를 보장하는 결과는 아님.
 - 운영 주소 접속 확인은 위 로컬 기능 및 부하 측정과 별도 범위.
-- 소프트웨어 code가 없는 문자의 특정 물리 키 위치 추정, 화면공간 배경 굴절형 열 왜곡은 구현 범위에서 제외. 원작 장면의 정확한 재현이나 직접 청취로 조정한 믹싱 품질을 보장하는 결과가 아닌 상태.
+- 소프트웨어 code가 없는 문자의 특정 물리 키 위치 추정은 구현 범위에서 제외. 원작 장면의 정확한 재현이나 직접 청취로 조정한 믹싱 품질을 보장하는 결과가 아닌 상태.
 
 ## 재현
 
@@ -122,8 +162,8 @@ npm run test:e2e
 node scripts/measure-scenes.mjs
 node scripts/generate-thumbnails.mjs
 node scripts/capture-scenes.mjs
-node scripts/capture-flow.mjs after
-node scripts/measure-breath.mjs
+node scripts/capture-digimon.mjs
+node scripts/measure-digimon.mjs
 node scripts/render-sound-demo.mjs
 npm run build
 npm run preview -- --port 5182

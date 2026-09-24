@@ -2,7 +2,6 @@ import type { KeyboardInput } from '../../input/KeyboardInput';
 import { BaseRuntime, type KeyBody } from '../shared/BaseRuntime';
 import type { ThemeDiagnostics } from '../types';
 import { Signature } from './Signature';
-import type { JudgmentEvent } from '../../challenge/types';
 
 export abstract class AnimationRuntime extends BaseRuntime {
   protected readonly signature = new Signature();
@@ -12,19 +11,6 @@ export abstract class AnimationRuntime extends BaseRuntime {
   override setChallengeActive(active: boolean) {
     if (active === this.challengeActive) return;
     super.setChallengeActive(active); this.signature.allowed = !active; this.signature.reset();
-  }
-  override onChallengeEvent(event: JudgmentEvent) {
-    super.onChallengeEvent(event);
-    if (event.type === 'reset') this.signature.reset();
-    if (event.type === 'correct') {
-      const key = this.keys.find(key => key.definition.code === event.code);
-      if (key) this.onStrike(key, false);
-    } else if (event.type === 'finished') {
-      const key = this.keys.find(key => key.definition.code === 'Enter');
-      this.signature.reset(); this.signature.allowed = true;
-      if (key) this.onStrike(key, false);
-      this.signature.allowed = !this.challengeActive;
-    }
   }
   override update(delta: number, input: KeyboardInput, reduced: boolean) {
     this.signature.update(delta, reduced);

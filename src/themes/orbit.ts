@@ -85,7 +85,7 @@ export default class Orbit extends BaseRuntime {
     const drift = reduced ? 0 : Math.sin(this.time * .85 + key.index * 1.37) * .028;
     key.group.position.y = key.restY + drift - key.state.displacement * (reduced ? .09 : .26);
     key.group.rotation.z = reduced ? 0 : Math.sin(this.time * .7 + key.index) * .008 * (1 - Math.max(0, key.state.displacement));
-    this.heats[key.index].value = key.state.heat + (key.state.down ? .12 : 0) + this.rewardAt(key);
+    this.heats[key.index].value = key.state.heat + (key.state.down ? .12 : 0);
   }
   protected override onPress(key: KeyBody, reduced: boolean) {
     if (reduced) return;

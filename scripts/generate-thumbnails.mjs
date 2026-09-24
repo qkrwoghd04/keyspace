@@ -19,7 +19,7 @@ try {
     await page.getByRole('button', { name, exact: true }).click();
     await page.waitForFunction(id => document.querySelector('.keyspace')?.getAttribute('data-preset') === id && !!window.__keyspace, id);
     // Thumbnail capture only: isolate the actual renderer and give it a fixed frame.
-    await page.addStyleTag({ content: '.keyspace{display:block!important}.collection-sidebar,.site-header,.site-footer,.thoughts,.mode-switch,.theme-status,.breath-controls{display:none!important}.main-room,.playground{display:block!important;min-height:0!important;height:228px!important}.keyboard-stage,.keyboard-scene{display:block!important;width:336px!important;height:228px!important;min-height:0!important}' });
+    await page.addStyleTag({ content: '.keyspace{display:block!important}.collection-sidebar,.site-header,.site-footer,.thoughts,.mode-switch,.theme-status,.partner-caption{display:none!important}.main-room,.playground{display:block!important;min-height:0!important;height:228px!important}.keyboard-stage,.keyboard-scene{display:block!important;width:336px!important;height:228px!important;min-height:0!important}' });
     await page.setViewportSize({ width: 336, height: 228 });
     await page.waitForTimeout(650);
     await page.screenshot({ path: `public/themes/${id}.png` });

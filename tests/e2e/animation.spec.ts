@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const animation = ['demon-slayer', 'pokemon', 'spider-verse', 'howl', 'evangelion'];
+const animation = ['digimon', 'pokemon', 'spider-verse', 'howl', 'evangelion'];
 async function select(page: Page, id: string) {
   if (page.viewportSize()!.width < 1024) await page.locator('.mobile-collection-open').click();
   await page.locator(`.collection-item[data-theme="${id}"]:visible`).click();
@@ -57,13 +57,13 @@ test('all groups collapse with keyboard controls, and the selected theme remains
   await expect(page.locator('.collection-sidebar [data-theme="howl"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('water and slash trails follow input order including a repeated key', async ({ page }) => {
-  await page.goto('/'); await select(page, 'demon-slayer');
+test('digital packets remember input order including a repeated key', async ({ page }) => {
+  await page.goto('/'); await select(page, 'digimon');
   await page.locator('#typing-space').focus();
   await page.keyboard.type('jajj', { delay: 30 });
   await expect.poll(() => page.evaluate(() => window.__keyspace!.state().effects.recentKeys)).toEqual(['KeyJ', 'KeyA', 'KeyJ', 'KeyJ']);
   const state = await page.evaluate(() => window.__keyspace!.state());
-  expect(state.effects.waves).toBeGreaterThan(0);
+  expect(state.effects.mechanism!.packets).toBeGreaterThan(0);
   await expect(page.locator('#typing-space')).toHaveValue('jajj');
 });
 

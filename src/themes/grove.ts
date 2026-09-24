@@ -134,7 +134,7 @@ export default class Grove extends BaseRuntime {
   protected override tick(delta: number, reduced: boolean) {
     for (const { mesh, key } of this.moss) mesh.scale.y = 1 - Math.max(0, key.state.displacement) * .52;
     for (const plant of this.plants) {
-      let heat = plant.key.state.heat + this.rewardAt(plant.key);
+      let heat = plant.key.state.heat;
       for (const key of this.keys) if (Math.abs(key.z - plant.key.z) < 1.2 && Math.abs(key.x - plant.key.x) < 1.4) heat = Math.max(heat, key.state.heat * .6);
       plant.group.rotation.z = plant.angle + (reduced ? 0 : Math.sin(this.time * 1.3 + plant.phase) * .035 + Math.sin(this.time * 13 + plant.phase) * heat * .18);
       plant.group.scale.y = 1 - plant.key.state.displacement * .2;

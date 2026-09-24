@@ -53,9 +53,9 @@ export default class Jelly extends BaseRuntime {
       if (neighbor === key || neighbor.state.down) continue;
       const dx = Math.max(0, Math.abs(neighbor.x - key.x) - (key.definition.width + neighbor.definition.width) * .3);
       const distance = Math.hypot(dx, neighbor.z - key.z);
-      const reach = 1.25 + this.rewardTier * .55;
+      const reach = 1.25;
       if (distance < reach) {
-        this.ripples[neighbor.index] = (.035 + this.rewardTier * .012) * (1 - distance / reach);
+        this.ripples[neighbor.index] = .035 * (1 - distance / reach);
         this.rippleTimes[neighbor.index] = this.time;
       }
     }

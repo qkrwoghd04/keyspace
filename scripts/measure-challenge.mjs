@@ -10,8 +10,8 @@ try {
   await page.locator('.collection-sidebar [data-theme="inferno"]').click();
   await expect(page.locator('.keyspace')).toHaveAttribute('data-preset', 'inferno');
   await page.getByRole('button', { name: 'Challenge', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Passage language' }).selectOption('english');
-  await page.getByRole('combobox', { name: 'Combo effects' }).selectOption('full');
+  await page.getByRole('combobox', { name: '지문 언어' }).selectOption('english');
+  await page.getByRole('textbox', { name: '닉네임', exact: true }).fill('프레임 검사');
   await page.locator('.race-start').click();
   await expect(page.locator('.challenge')).toHaveAttribute('data-phase', 'running');
   const before = await page.evaluate(() => ({ at: performance.now(), frames: window.__keyspace.state().frames }));
@@ -21,10 +21,11 @@ try {
     if (await page.locator('.challenge').getAttribute('data-phase') !== 'running') break;
     await page.keyboard.type(character, { delay: 22 });
     if (samples.length === 0 || Date.now() - samples.at(-1).at > 1000) {
-      samples.push(await page.evaluate(() => { const s = window.__keyspace.state(); return { at: Date.now(), elapsed: window.__challenge.state().race.elapsedMs, frameP95: s.frameP95, memory: s.memory, programs: s.programs, rewards: s.rewards, drawCalls: s.drawCalls }; }));
+      samples.push(await page.evaluate(() => { const s = window.__keyspace.state(); return { at: Date.now(), elapsed: window.__challenge.state().race.elapsedMs, frameP95: s.frameP95, memory: s.memory, programs: s.programs, drawCalls: s.drawCalls }; }));
     }
   }
   await expect(page.locator('.challenge')).toHaveAttribute('data-phase', 'finished', { timeout: 35000 });
+  await expect(page.locator('.race-save')).toHaveText('저장 완료');
   const after = await page.evaluate(() => ({ at: performance.now(), frames: window.__keyspace.state().frames, session: window.__challenge.state() }));
   expect(after.session.last.result.elapsedMs).toBe(30000);
   expect(after.session.last.result.errors).toBe(0); expect(after.session.saved).toBe(true);
@@ -33,8 +34,7 @@ try {
   for (let i = 0; i < 20; i++) {
     await page.getByRole('button', { name: 'Playground', exact: true }).click();
     await page.waitForTimeout(80);
-    const outside = await page.evaluate(() => ({ memory: window.__keyspace.state().memory, rewards: window.__keyspace.state().rewards }));
-    expect(outside.rewards).toBeNull();
+    const outside = await page.evaluate(() => ({ memory: window.__keyspace.state().memory }));
     await page.getByRole('button', { name: 'Challenge', exact: true }).click();
     await page.waitForTimeout(80);
     const inside = await page.evaluate(() => ({ memory: window.__keyspace.state().memory, programs: window.__keyspace.state().programs }));

@@ -1,6 +1,5 @@
 import type { ThemeId } from '../themes/types';
 import { random } from '../themes/shared/random';
-import { SUN_SOUND, WATER_SOUND } from '../themes/demon-slayer/sound';
 
 export type SoundKeyClass = 'character' | 'space' | 'enter';
 interface Frame { t: number; white: number; low: number; high: number; pitch: number; body: number; keyClass: SoundKeyClass }
@@ -48,7 +47,10 @@ export const SOUND_PROFILES: Record<ThemeId, SoundProfile> = {
     duration: .265, releaseDuration: .085,
     render: ({ t, low, pitch: p, body }) => tone(115 * p, t) * envelope(t, .038, .002) * body * .6 + Math.asin(tone(370 * p, t)) / (Math.PI / 2) * envelope(t, .039, .0012) * .65 + tone(746 * p, t) * envelope(t, .02) * .16 + tone(370 * p, t - .027) * envelope(t - .027, .024) * .1 + tone(375 * p, t - .043) * envelope(t - .043, .018) * .065 + low * envelope(t, .008) * .22,
   },
-  'demon-slayer': WATER_SOUND,
+  digimon: {
+    duration: .19, releaseDuration: .045,
+    render: ({ t, high, pitch: p, keyClass }) => Math.asin(tone(660 * p, t)) * envelope(t, .019) * .25 + tone(185 * p, t) * envelope(t, .023) * .6 + high * envelope(t, .002) * .25 + (keyClass === 'enter' ? tone((t < .035 ? 880 : t < .07 ? 1109 : 1320) * p, t) * envelope(t, .05) * .27 : keyClass === 'space' ? drop(720, 170, .018, t) * envelope(t, .03) * .25 : 0),
+  },
   pokemon: {
     duration: .18, releaseDuration: .055,
     render: ({ t, high, pitch: p, keyClass }) => drop(1030 * p, 470 * p, .012, t) * envelope(t, .021) * .55 + tone(210 * p, t) * envelope(t, .011) * .3 + high * envelope(t, .002) * .4 + (keyClass === 'enter' ? tone(1327 * p, t) * envelope(t - .035, .026) * .2 : keyClass === 'space' ? Math.sin(t * 4900 + Math.sin(t * 900) * 3) * envelope(t - .015, .021) * .16 : 0),
@@ -70,8 +72,8 @@ export const SOUND_PROFILES: Record<ThemeId, SoundProfile> = {
 export function soundKeyClass(code: string): SoundKeyClass { return code === 'Space' ? 'space' : code === 'Enter' ? 'enter' : 'character'; }
 
 /** Deterministic PCM, cached by the engine. Zero-mean, tapered and peak bounded. */
-export function synthesizeSound(id: ThemeId, keyClass: SoundKeyClass, release: boolean, sampleRate: number, breath: 'water' | 'sun' = 'water'): Float32Array<ArrayBuffer> {
-  const profile = id === 'demon-slayer' && breath === 'sun' ? SUN_SOUND : SOUND_PROFILES[id];
+export function synthesizeSound(id: ThemeId, keyClass: SoundKeyClass, release: boolean, sampleRate: number): Float32Array<ArrayBuffer> {
+  const profile = SOUND_PROFILES[id];
   const width = keyClass === 'space' ? 1.18 : keyClass === 'enter' ? 1.08 : 1;
   const duration = Math.min(.3, (release ? profile.releaseDuration : profile.duration) * width);
   const samples = new Float32Array(Math.ceil(duration * sampleRate));

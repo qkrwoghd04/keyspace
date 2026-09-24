@@ -5,7 +5,6 @@ import { disposeObject } from '../../keyboard/KeyboardModel';
 import type { KeyboardInput } from '../../input/KeyboardInput';
 import type { QualitySettings, ThemeContext, ThemeDiagnostics, ThemeRuntime } from '../types';
 import { KeyState } from './KeyState';
-import type { JudgmentEvent } from '../../challenge/types';
 
 export interface KeyBody {
   definition: KeyDefinition;
@@ -29,9 +28,6 @@ export abstract class BaseRuntime implements ThemeRuntime {
   protected stiffness = 760;
   protected damping = 39;
   protected challengeActive = false;
-  protected rewardTier = 0;
-  protected rewardPulse = 0;
-  protected rewardOrigin: { x: number; z: number } | null = null;
   private disposed = false;
   private readonly legends = new Map<string, THREE.MeshStandardMaterial>();
 
@@ -79,25 +75,11 @@ export abstract class BaseRuntime implements ThemeRuntime {
   protected clear(): void {}
   setChallengeActive(active: boolean) {
     if (active === this.challengeActive) return;
-    this.challengeActive = active; this.rewardTier = this.rewardPulse = 0; this.rewardOrigin = null; this.clear();
-  }
-  onChallengeEvent(event: JudgmentEvent) {
-    if (event.type === 'correct') {
-      this.rewardTier = event.tier; this.rewardPulse = 1;
-      const key = this.keys.find(key => key.definition.code === event.code);
-      if (key) { this.rewardOrigin = { x: key.x, z: key.z }; this.onPress(key, false); }
-    } else if (event.type === 'combo') this.rewardTier = event.tier;
-    else if (event.type === 'error' || event.type === 'reset') { this.rewardTier = this.rewardPulse = 0; this.rewardOrigin = null; if (event.type === 'reset') this.clear(); }
-  }
-  protected rewardAt(key: KeyBody) {
-    if (!this.rewardOrigin) return 0;
-    const distance = Math.hypot(key.x - this.rewardOrigin.x, key.z - this.rewardOrigin.z);
-    return this.rewardPulse * this.rewardTier * .2 * Math.max(0, 1 - distance / 3.5);
+    this.challengeActive = active; this.clear();
   }
 
   update(delta: number, input: KeyboardInput, reduced: boolean) {
-    if (!reduced) this.time += delta;
-    this.rewardPulse = reduced ? 0 : this.rewardPulse * Math.exp(-4.5 * delta);
+    if (!reduced && !this.challengeActive) this.time += delta;
     let moving = false;
     for (const key of this.keys) {
       moving = key.state.update(delta, input, reduced, this.stiffness, this.damping) || moving;
@@ -105,11 +87,10 @@ export abstract class BaseRuntime implements ThemeRuntime {
       if (key.state.released && !this.challengeActive) this.onRelease(key, reduced);
       this.pose(key, reduced);
     }
-    return this.tick(delta, reduced) || moving || this.rewardPulse > .002;
+    return this.tick(delta, reduced || this.challengeActive) || moving;
   }
 
   reset(input: KeyboardInput) {
-    this.rewardTier = this.rewardPulse = 0; this.rewardOrigin = null;
     for (const key of this.keys) { key.state.reset(input); this.pose(key, true); }
     this.clear();
   }

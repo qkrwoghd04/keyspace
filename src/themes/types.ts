@@ -1,10 +1,8 @@
 import type * as THREE from 'three';
 import type { KeyboardInput } from '../input/KeyboardInput';
 import type { KeyboardPreset } from '../keyboard/presets';
-import type { EffectIntensity, JudgmentEvent } from '../challenge/types';
-import type { BreathController } from './demon-slayer/BreathController';
 
-export type AnimationThemeId = 'demon-slayer' | 'pokemon' | 'spider-verse' | 'howl' | 'evangelion';
+export type AnimationThemeId = 'digimon' | 'pokemon' | 'spider-verse' | 'howl' | 'evangelion';
 export type ThemeId = 'studio' | 'dark' | 'glass' | 'neon' | 'inferno' | 'glacier' | 'jelly' | 'grove' | 'orbit' | AnimationThemeId;
 export type ThemeCategory = 'CLASSIC' | 'EXPERIMENTAL' | 'ANIMATION';
 export type SceneAppearance = Pick<KeyboardPreset, 'background' | 'ui' | 'lighting' | 'accent' | 'mood'>;
@@ -29,11 +27,9 @@ export const LOW_QUALITY: QualitySettings = {
 export interface ThemeContext {
   legendTexture: THREE.Texture;
   quality: QualitySettings;
-  breath?: BreathController;
 }
 
 export interface ThemeRuntime {
-  readonly nativeChallengeEffects?: boolean;
   readonly group: THREE.Group;
   readonly hitTargets: THREE.Mesh[];
   /** Conservative hero bounds, including maximum motion, but not the background. */
@@ -43,8 +39,6 @@ export interface ThemeRuntime {
   setQuality(quality: QualitySettings): void;
   diagnostics(): ThemeDiagnostics;
   setChallengeActive?(active: boolean): void;
-  onChallengeEvent?(event: JudgmentEvent): void;
-  setEffectIntensity?(intensity: EffectIntensity): void;
   dispose(): void;
 }
 
@@ -55,7 +49,6 @@ export interface ThemeDiagnostics {
   signature?: { active: boolean; kind: 'enter' | 'space'; progress: number; starts: number; queued: 0 };
   strikes?: number;
   recentKeys?: string[];
-  trail?: { anchors: { code: string; x: number; y: number; z: number }[]; water: number[][]; sun: number[][] };
   mechanism?: Record<string, number | string | boolean>;
 }
 

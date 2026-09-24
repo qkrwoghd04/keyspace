@@ -88,7 +88,7 @@ export default class Inferno extends BaseRuntime {
   protected override pose(key: KeyBody, reduced: boolean) {
     super.pose(key, reduced);
     key.group.rotation.x = reduced ? 0 : key.state.displacement * .018;
-    this.heats[key.index].value = key.state.heat + (key.state.down ? .17 : 0) + this.rewardAt(key);
+    this.heats[key.index].value = key.state.heat + (key.state.down ? .17 : 0);
   }
   protected override onPress(key: KeyBody, reduced: boolean) {
     if (!reduced) this.embers.burst(key.x, key.restY + .45, key.z, this.quality.level === 'low' ? 3 : 6, 1.7, key.definition.width * .55, .027);
@@ -97,7 +97,7 @@ export default class Inferno extends BaseRuntime {
     this.flames.update(this.time, this.keys, reduced);
     let heat = .1;
     for (const key of this.keys) heat = Math.max(heat, key.state.heat * .45);
-    this.bodyHeat.value = heat + this.rewardTier * this.rewardPulse * .09;
+    this.bodyHeat.value = heat;
     if (!reduced && this.time > this.nextEmber) {
       const key = this.keys[Math.floor(this.time * 17) % this.keys.length];
       this.embers.burst(key.x, 1.1, key.z + .48, 1, .55, .1, .018);

@@ -14,5 +14,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  webServer: { command: 'npm run dev -- --host 127.0.0.1 --port 5180', url: 'http://127.0.0.1:5180', reuseExistingServer: true },
+  webServer: [
+    { command: 'npx tsx scripts/e2e-api.ts', url: 'http://127.0.0.1:5183/api/health', reuseExistingServer: false },
+    { command: 'npm run dev -- --host 127.0.0.1 --port 5180', url: 'http://127.0.0.1:5180', reuseExistingServer: true },
+  ],
 });

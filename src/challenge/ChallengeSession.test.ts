@@ -1,63 +1,72 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ChallengeChannel } from './ChallengeChannel';
 import { ChallengeSession } from './ChallengeSession';
-import { loadRecords, RECORDS_KEY, type RecordStorage } from './records';
+import { PASSAGES } from './passages';
+import { conditionsFor, type RaceRecord, type PassageChoice, type RunTicket } from './types';
+import { replay } from './scoring';
+import { ApiError, type ChallengeApi } from './api';
 
-function setup() {
-  let now = 0, denied = '';
-  const data = new Map<string, string>([['unrelated', 'keep']]);
-  const storage: RecordStorage = {
-    getItem(key) { if (denied === 'read') throw Error('read denied'); return data.get(key) ?? null; },
-    setItem(key, value) { if (denied === 'write') throw Error('quota'); data.set(key, value); },
-    removeItem(key) { if (denied === 'delete') throw Error('delete denied'); data.delete(key); },
+async function setup() {
+  let now = 0, denied = false, count = 0;
+  const saved = new Map<string, RaceRecord>();
+  const api: ChallengeApi = {
+    player: vi.fn(async () => ({ player: null })),
+    register: vi.fn(async nickname => ({ player: { id: 'player', nickname } })),
+    start: vi.fn(async (choice: PassageChoice) => ({ id: String(++count), conditions: conditionsFor(PASSAGES[choice]), expiresAt: new Date(633000).toISOString() })),
+    finish: vi.fn(async (id, edits) => {
+      if (denied) throw new Error('저장 실패');
+      const record = { id, createdAt: new Date(now).toISOString(), conditions: conditionsFor(PASSAGES.english), result: replay(PASSAGES.english, edits) };
+      saved.set(id, record); return record;
+    }),
+    cancel: vi.fn(async () => {}), leaderboard: vi.fn(async () => ({ items: [], hasMore: false })),
+    records: vi.fn(async () => ({ items: [...saved.values()], hasMore: false })), deleteRecords: vi.fn(async () => {}),
   };
-  const channel = new ChallengeChannel(), session = new ChallengeSession(channel, () => storage, () => now);
-  session.configure('english', 30);
-  const run = (count = 10) => { session.start(); now += 3100; session.commit(session.passage.text.slice(0, count), 'KeyA'); now += 30000; session.tick(); };
-  return { session, channel, data, storage, run, deny: (type: string) => { denied = type; }, time: (value: number) => { now = value; } };
+  const channel = new ChallengeChannel(), session = new ChallengeSession(channel, api, () => now);
+  await session.initialize(); session.configure('english');
+  const run = async () => { await session.start('테스터'); now += 3100; session.commit(PASSAGES.english.text.slice(0, 30)); now += 30000; session.tick(); await vi.waitFor(() => expect(session.getSnapshot().saving).toBe(false)); };
+  return { session, channel, api, saved, run, deny: (value: boolean) => { denied = value; }, time: (value: number) => { now = value; } };
 }
-describe('challenge session transactions', () => {
-  it('saves one completion, compares exact-condition bests and never saves free text', () => {
-    const { session, run, data } = setup(); run();
-    expect(session.getSnapshot()).toMatchObject({ saved: true, personalBest: true });
-    session.tick(); expect(session.getSnapshot().records).toHaveLength(1);
-    run(5); expect(session.getSnapshot()).toMatchObject({ personalBest: false, previousBest: { result: { correct: 10 } } });
-    expect(data.get(RECORDS_KEY)).not.toContain('A quiet');
-    session.configure('code', 30); expect(session.getSnapshot().previousBest).toBeNull();
+describe('asynchronous server record session', () => {
+  it('registers once, saves confirmed results once and does not use localStorage', async () => {
+    const local = vi.spyOn(Storage.prototype, 'setItem'), { session, run, api, saved } = await setup();
+    await run(); session.tick();
+    expect(session.getSnapshot()).toMatchObject({ saved: true, revision: 1, last: { result: { speed: 1 } } });
+    expect(saved.size).toBe(1); await run(); expect(api.register).toHaveBeenCalledTimes(1); expect(saved.size).toBe(2); expect(local).not.toHaveBeenCalled();
   });
-  it('locks configuration and mode presentation through countdown and run', () => {
-    const { session, channel, time } = setup(); session.start();
-    session.configure('code', 60); expect(session.getSnapshot()).toMatchObject({ choice: 'english', duration: 30 });
-    expect(channel.state.racing).toBe(true); time(5000); session.tick(); session.cancel();
-    expect(channel.state.racing).toBe(false); session.configure('code', 60);
-    expect(session.getSnapshot()).toMatchObject({ choice: 'code', duration: 60 });
+  it('locks settings through connection, countdown and typing', async () => {
+    const { session, channel } = await setup(); const pending = session.start('테스터');
+    expect(session.locked).toBe(true); session.configure('korean'); expect(session.getSnapshot().choice).toBe('english');
+    await pending; expect(channel.state.racing).toBe(true);
+    session.cancel(); expect(channel.state.racing).toBe(false); session.configure('korean'); expect(session.getSnapshot().choice).toBe('korean');
   });
-  it('never persists an interrupted run, including during countdown', () => {
-    const { session, data, time } = setup(); session.start(); session.cancel('hidden'); time(99000); session.tick();
-    expect(session.getSnapshot()).toMatchObject({ race: { phase: 'canceled', result: null }, saved: false, personalBest: false });
-    expect(data.has(RECORDS_KEY)).toBe(false);
+  it('keeps failed results and retries the same ticket without duplication', async () => {
+    const { session, run, deny, saved, api } = await setup(); deny(true); await run();
+    expect(session.getSnapshot()).toMatchObject({ saved: false, error: '저장 실패', race: { phase: 'finished', correct: 30 } });
+    deny(false); await session.retrySave(); await session.retrySave();
+    expect(saved.size).toBe(1); expect(api.finish).toHaveBeenCalledTimes(2); expect(session.getSnapshot().saved).toBe(true);
   });
-  it('retains an unsaved result and retries the same id without duplication', () => {
-    const { session, deny, run } = setup(); deny('write'); run();
-    const id = session.getSnapshot().last!.id;
-    expect(session.getSnapshot()).toMatchObject({ saved: false, records: [] }); expect(session.getSnapshot().storageError).toContain('저장 실패');
-    deny(''); session.retrySave(); session.retrySave();
-    expect(session.getSnapshot()).toMatchObject({ saved: true, storageError: '' }); expect(session.getSnapshot().records.map(row => row.id)).toEqual([id]);
+  it('cancels without submitting, including a late ticket arriving after tab hiding', async () => {
+    const { session, api, time } = await setup();
+    let resolve!: (value: Awaited<ReturnType<ChallengeApi['start']>>) => void;
+    api.start = vi.fn(() => new Promise<RunTicket>(done => { resolve = done; }));
+    const pending = session.start('테스터'); await vi.waitFor(() => expect(api.start).toHaveBeenCalled());
+    session.cancel('hidden'); resolve({ id: 'late', conditions: conditionsFor(PASSAGES.english), expiresAt: '' }); await pending;
+    time(99000); session.tick(); expect(api.cancel).toHaveBeenCalledWith('late'); expect(api.finish).not.toHaveBeenCalled(); expect(session.locked).toBe(false);
   });
-  it('does not overwrite unreadable data, and recovers after explicit deletion', () => {
-    const { session, data, run } = setup(); data.set(RECORDS_KEY, '{broken'); run();
-    expect(session.getSnapshot().saved).toBe(false); expect(data.get(RECORDS_KEY)).toBe('{broken');
-    session.clearRecords(); session.retrySave(); expect(session.getSnapshot().saved).toBe(true);
+  it('does not claim persistence before the response and clears saved status on deletion', async () => {
+    const { session, run } = await setup(); await run(); expect(session.getSnapshot().saved).toBe(true);
+    session.recordsDeleted(); expect(session.getSnapshot()).toMatchObject({ saved: false, last: null, revision: 2 });
   });
-  it('retains records on delete failure and removes only the challenge key on success', () => {
-    const { session, data, deny, run, storage } = setup(); run(); deny('delete'); session.clearRecords();
-    expect(session.getSnapshot().records).toHaveLength(1); expect(loadRecords(storage).records).toHaveLength(1);
-    deny(''); session.clearRecords(); expect(session.getSnapshot().records).toHaveLength(0); expect(data.get('unrelated')).toBe('keep'); expect(data.has(RECORDS_KEY)).toBe(false);
+  it('rejects a server ticket for a different passage version before countdown', async () => {
+    const { session, api } = await setup();
+    api.start = vi.fn(async () => ({ id: 'changed', conditions: { ...conditionsFor(PASSAGES.english), passageVersion: 2 }, expiresAt: '' }));
+    await session.start('테스터');
+    expect(api.cancel).toHaveBeenCalledWith('changed'); expect(session.locked).toBe(false);
+    expect(session.getSnapshot().error).toContain('새로고침'); expect(api.finish).not.toHaveBeenCalled();
   });
-  it('offers only actual saved ghosts with exactly compatible settings', () => {
-    const { session, run } = setup(); run(); const id = session.getSnapshot().last!.id;
-    session.chooseGhost(id); expect(session.getSnapshot().ghost?.id).toBe(id);
-    session.configure('english', 60); session.chooseGhost(id); expect(session.getSnapshot().ghost).toBeNull();
-    session.chooseGhost('fake'); expect(session.getSnapshot().ghost).toBeNull();
+  it('allows nickname registration again when the cookie was removed while the page stayed open', async () => {
+    const { session, api } = await setup();
+    api.start = vi.fn(async () => { throw new ApiError('닉네임을 다시 등록해 주세요.', 401); });
+    await session.start('테스터'); expect(session.getSnapshot().player).toBeNull(); expect(session.locked).toBe(false);
   });
 });

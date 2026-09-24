@@ -1,0 +1,31 @@
+services:
+  keyspace:
+    build: .
+    image: keyspace-challenge:local
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:${KEYSPACE_PORT:-5183}:3000"
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the exact HTTPS website origin}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+    volumes:
+      - keyspace-data:/data
+      - keyspace-backups:/backups
+    cpus: 2
+    mem_limit: 1g
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  keyspace-data:
+  keyspace-backups:

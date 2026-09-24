@@ -1,42 +1,32 @@
-export type PassageChoice = 'korean' | 'english' | 'code';
-export type Duration = 30 | 60;
+export type PassageChoice = 'korean' | 'english';
 export type RacePhase = 'ready' | 'countdown' | 'running' | 'finished' | 'canceled';
-export type EffectIntensity = 'full' | 'low' | 'off';
-export const RULE_VERSION = 'correct-prefix-v1' as const;
+export const RULE_VERSION = 'correct-prefix-cps-v2' as const;
+export const DURATION_MS = 30_000;
+export const COUNTDOWN_MS = 3_000;
+export const MAX_EDITS = 4096;
+export const PAGE_SIZE = 20;
 
 export interface Passage {
   id: string; version: number; choice: PassageChoice; title: string;
-  language: 'ko' | 'en'; kind: 'prose' | 'code'; text: string;
+  language: 'ko' | 'en'; kind: 'prose'; text: string;
 }
 export interface RaceConditions {
-  passageId: string; passageVersion: number; language: 'ko' | 'en'; kind: 'prose' | 'code';
-  duration: Duration; rule: typeof RULE_VERSION;
+  passageId: string; passageVersion: number; choice: PassageChoice; duration: 30; rule: typeof RULE_VERSION;
 }
-export type ProgressPoint = [elapsedMs: number, correctPosition: number];
+/** Grapheme offsets, not physical key codes. Held only until server verification. */
+export interface InputEdit { at: number; start: number; deleteCount: number; insert: string }
 export interface RaceResult {
-  correct: number; uniqueCorrect: number; errors: number; accuracy: number; speed: number;
-  unit: 'WPM' | 'CPM'; maxCombo: number; elapsedMs: number;
+  correct: number; uniqueCorrect: number; errors: number; accuracy: number; speed: number; elapsedMs: number;
 }
-export interface RaceRecord {
-  id: string; createdAt: string; conditions: RaceConditions; result: RaceResult; progress: ProgressPoint[];
+export interface RaceSnapshot extends RaceResult {
+  phase: RacePhase; text: string; remainingMs: number; countdown: number; reason: string; result: RaceResult | null;
 }
-export interface RaceSnapshot {
-  phase: RacePhase; text: string; correct: number; uniqueCorrect: number; errors: number;
-  combo: number; maxCombo: number; tier: number; accuracy: number; speed: number;
-  elapsedMs: number; remainingMs: number; countdown: number; reason: string; result: RaceResult | null;
-}
-export type JudgmentEvent =
-  | { type: 'correct'; count: number; position: number; combo: number; tier: number; code?: string }
-  | { type: 'error'; count: number; position: number }
-  | { type: 'combo'; value: number; tier: number }
-  | { type: 'finished'; result: RaceResult; personalBest?: boolean }
-  | { type: 'reset' };
+export interface Player { id: string; nickname: string }
+export interface RunTicket { id: string; conditions: RaceConditions; expiresAt: string }
+export interface RaceRecord { id: string; createdAt: string; conditions: RaceConditions; result: RaceResult }
+export interface RankingRecord extends RaceRecord { rank: number; nickname: string; isMe: boolean }
+export interface RecordPage<T = RaceRecord> { items: T[]; hasMore: boolean }
 
-export function conditionsFor(passage: Passage, duration: Duration): RaceConditions {
-  return { passageId: passage.id, passageVersion: passage.version, language: passage.language, kind: passage.kind, duration, rule: RULE_VERSION };
+export function conditionsFor(passage: Passage): RaceConditions {
+  return { passageId: passage.id, passageVersion: passage.version, choice: passage.choice, duration: 30, rule: RULE_VERSION };
 }
-export function conditionKey(value: RaceConditions) {
-  return JSON.stringify([value.passageId, value.passageVersion, value.language, value.kind, value.duration, value.rule]);
-}
-export const sameConditions = (a: RaceConditions, b: RaceConditions) => conditionKey(a) === conditionKey(b);
-export const comboTier = (combo: number) => combo >= 50 ? 3 : combo >= 25 ? 2 : combo >= 10 ? 1 : 0;

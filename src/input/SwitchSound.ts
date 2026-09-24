@@ -1,6 +1,5 @@
 import type { ThemeId } from '../themes/types';
 import { soundKeyClass, synthesizeSound, type SoundKeyClass } from './soundProfiles';
-import { synthesizeAwakening } from '../themes/demon-slayer/sound';
 
 export const MAX_VOICES = 16;
 interface Voice { gain: GainNode; source: AudioBufferSourceNode | null; retiring: AudioBufferSourceNode | null; startedAt: number }
@@ -18,8 +17,6 @@ export class SwitchSound {
   private hidden = false;
   private volume = .5;
   private profile: ThemeId = 'studio';
-  private breath: 'water' | 'sun' = 'water';
-  private lastBreathTransition = -Infinity;
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
@@ -40,27 +37,6 @@ export class SwitchSound {
     this.stopAll();
     this.profile = profile;
     if (this.context) this.prepare();
-  }
-
-  setBreathMode(mode: 'water' | 'sun') {
-    if (this.breath === mode) return;
-    this.breath = mode;
-    if (this.context && this.profile === 'demon-slayer') this.prepare();
-  }
-
-  playBreathTransition() {
-    if (this.profile !== 'demon-slayer' || !this.enabled || this.hidden || !this.volume) return;
-    this.unlock();
-    const context = this.context;
-    if (!context || context.state !== 'running') return;
-    if (context.currentTime - this.lastBreathTransition < .9) return;
-    this.lastBreathTransition = context.currentTime;
-    const key = 'demon-slayer:awakening';
-    if (!this.buffers.has(key)) {
-      const samples = synthesizeAwakening(context.sampleRate), buffer = context.createBuffer(1, samples.length, context.sampleRate);
-      buffer.copyToChannel(samples, 0); this.buffers.set(key, buffer);
-    }
-    this.playBuffer(this.buffers.get(key)!);
   }
 
   setHidden(hidden: boolean) {
@@ -106,7 +82,7 @@ export class SwitchSound {
     }
   }
 
-  private bufferKey(keyClass: SoundKeyClass, release: boolean) { return this.profile + ':' + keyClass + ':' + Number(release) + (this.profile === 'demon-slayer' && this.breath === 'sun' ? ':sun' : ''); }
+  private bufferKey(keyClass: SoundKeyClass, release: boolean) { return this.profile + ':' + keyClass + ':' + Number(release); }
 
   private prepare() {
     const context = this.context;
@@ -114,7 +90,7 @@ export class SwitchSound {
     for (const keyClass of ['character', 'space', 'enter'] as const) for (const release of [false, true]) {
       const key = this.bufferKey(keyClass, release);
       if (this.buffers.has(key)) continue;
-      const samples = synthesizeSound(this.profile, keyClass, release, context.sampleRate, this.breath);
+      const samples = synthesizeSound(this.profile, keyClass, release, context.sampleRate);
       const buffer = context.createBuffer(1, samples.length, context.sampleRate);
       buffer.copyToChannel(samples, 0);
       this.buffers.set(key, buffer);
@@ -197,13 +173,12 @@ export class SwitchSound {
   }
 
   diagnostics() {
-    return { enabled: this.enabled, volume: this.volume, profile: this.profile, breath: this.breath, voices: this.voices.filter(voice => voice.source).length, sources: this.sources.size, buffers: this.buffers.size, state: this.context?.state ?? 'not-created' };
+    return { enabled: this.enabled, volume: this.volume, profile: this.profile, voices: this.voices.filter(voice => voice.source).length, sources: this.sources.size, buffers: this.buffers.size, state: this.context?.state ?? 'not-created' };
   }
 
   dispose() {
     this.stopAll();
     this.enabled = false;
-    this.lastBreathTransition = -Infinity;
     for (const voice of this.voices) voice.gain.disconnect();
     this.voices = [];
     this.master?.disconnect(); this.compressor?.disconnect(); this.limiter?.disconnect();

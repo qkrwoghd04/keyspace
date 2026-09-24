@@ -113,8 +113,6 @@ export class KeyboardInput {
   }
 
   setSoundProfile(profile: ThemeId): void { this.sound.setProfile(profile); }
-  setBreathSound(mode: 'water' | 'sun'): void { this.sound.setBreathMode(mode); }
-  playBreathTransition(): void { this.sound.playBreathTransition(); }
   playCommittedSound(): void { this.sound.play('KeyA'); }
   audioDiagnostics() { return this.sound.diagnostics(); }
 

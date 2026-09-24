@@ -97,7 +97,7 @@ export default class Glacier extends BaseRuntime {
   }
   protected override pose(key: KeyBody, reduced: boolean) {
     super.pose(key, reduced);
-    this.heats[key.index].value = key.state.heat + this.rewardAt(key);
+    this.heats[key.index].value = key.state.heat;
     const heat = this.heats[key.index].value;
     this.crackMaterials[key.index].color.setRGB(.28 + heat * .52, .48 + heat * .42, .55 + heat * .45);
   }

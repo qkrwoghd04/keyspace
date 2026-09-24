@@ -47,9 +47,9 @@ export const THEMES: readonly ThemeDefinition[] = [
     load: loadTheme(() => import('./orbit')),
   },
   {
-    id: 'demon-slayer', name: '귀멸의 칼날', category: 'ANIMATION', material: 'Tanjiro / Water into Sun',
-    thumbnail: `${import.meta.env.BASE_URL}themes/demon-slayer.png`, colorScheme: 'light', swatches: ['#173e42', '#e0eced', '#247b9f'], appearance: ANIMATION_APPEARANCES['demon-slayer'],
-    load: loadTheme(() => import('./animation/demon-slayer')),
+    id: 'digimon', name: '디지몬', category: 'ANIMATION', material: 'Digivice / digital partner',
+    thumbnail: `${import.meta.env.BASE_URL}themes/digimon.png`, colorScheme: 'light', swatches: ['#d78536', '#f1ead5', '#597962'], appearance: ANIMATION_APPEARANCES.digimon,
+    load: loadTheme(() => import('./animation/digimon')),
   },
   {
     id: 'pokemon', name: '포켓몬', category: 'ANIMATION', material: 'Field Pokédex / companion',
