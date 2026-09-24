@@ -58,6 +58,8 @@ export default function App() {
   const [challengeChannel] = useState(() => new ChallengeChannel());
   const [challengeLoaded, setChallengeLoaded] = useState(false);
   const challenge = useRef<ChallengeHandle>(null);
+  // Challenge borrows the collection's width for the keyboard; leaving restores the visitor's choice.
+  const collapsedBeforeChallenge = useRef<boolean | null>(null);
   const preset = activeTheme.appearance;
 
   const theme = {
@@ -125,7 +127,14 @@ export default function App() {
   const selectMode = (next: 'playground' | 'challenge') => {
     if (challengeChannel.state.racing || mode === next) return;
     input.releaseAll();
-    if (next === 'challenge') setChallengeLoaded(true);
+    if (next === 'challenge') {
+      setChallengeLoaded(true);
+      collapsedBeforeChallenge.current = collapsed;
+      setCollapsed(true);
+    } else if (collapsedBeforeChallenge.current !== null) {
+      setCollapsed(collapsedBeforeChallenge.current);
+      collapsedBeforeChallenge.current = null;
+    }
     challengeChannel.configure({ enabled: next === 'challenge' });
     setMode(next);
   };

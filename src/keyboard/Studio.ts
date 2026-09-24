@@ -18,6 +18,9 @@ declare global {
   }
 }
 
+const PIXEL_RATIO_STEP = 0.25;
+const MIN_PIXEL_RATIO = 1;
+
 export class Studio {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera(-10, 10, 5, -5, 0.1, 80);
@@ -41,6 +44,11 @@ export class Studio {
   private requestVersion = 0;
   private quality: QualitySettings = window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches ? LOW_QUALITY : STANDARD_QUALITY;
   private slowFrames = 0;
+  private fastFrames = 0;
+  private pixelRatio = 1;
+  // Highest ratio this device has held without stalling; lowered when a recovery fails.
+  private pixelRatioCeiling = Infinity;
+  private lastRatioRaise = -Infinity;
   private frameDurations: number[] = [];
   private renderedFrames = 0;
   private readonly legendTexture = createLegendAtlas().texture;
@@ -64,11 +72,12 @@ export class Studio {
     private readonly virtualKey: (code: string) => void,
     private readonly onUnavailable: () => void,
   ) {
-    this.renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true, powerPreference: 'low-power'});
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.dpr));
+    this.renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+    this.setPixelRatio(this.maxPixelRatio());
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // Neutral keeps albedo and contrast intact below the highlights; ACES washed legends and pastels out.
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.12;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -105,7 +114,7 @@ export class Studio {
     this.addContactShadow();
     const room = new RoomEnvironment();
     const generator = new THREE.PMREMGenerator(this.renderer);
-    this.environment = generator.fromScene(room, 0.04, 0.1, 100, {size: 128});
+    this.environment = generator.fromScene(room, 0.04, 0.1, 100, {size: 256});
     this.scene.environment = this.environment.texture;
     room.dispose();
     generator.dispose();
@@ -183,7 +192,7 @@ export class Studio {
       this.theme = theme;
       this.input.setSoundProfile(theme.id);
       this.frameDurations = [];
-      this.slowFrames = 0;
+      this.slowFrames = this.fastFrames = 0;
       this.scene.add(next.group);
       previous.dispose();
       this.transitionRemaining = this.reducedMotion ? 0 : 0.2;
@@ -251,7 +260,10 @@ export class Studio {
     const aspect = width / height;
     const contentWidth = projected.max.x - projected.min.x;
     const contentHeight = projected.max.y - projected.min.y;
-    const frustumHeight = Math.max(contentHeight * 1.21, contentWidth * 1.115 / aspect);
+    // Desktop Challenge moves its controls aside, so the keyboard can claim more of its stage.
+    const aside = this.challengeState.enabled && window.matchMedia('(min-width: 1024px)').matches;
+    const [padY, padX] = aside ? [1.1, 1.04] : [1.21, 1.115];
+    const frustumHeight = Math.max(contentHeight * padY, contentWidth * padX / aspect);
     const middleY = (projected.max.y + projected.min.y) / 2 - 0.2;
     const middleX = (projected.max.x + projected.min.x) / 2;
     this.camera.left = -frustumHeight * aspect / 2 + middleX;
@@ -359,8 +371,7 @@ export class Studio {
     this.previousFrame = now;
     this.frameDurations.push(elapsed * 1000);
     if (this.frameDurations.length > 240) this.frameDurations.shift();
-    this.slowFrames = elapsed > 0.025 ? this.slowFrames + delta : Math.max(0, this.slowFrames - delta);
-    if (this.slowFrames > 3 && this.quality.level === 'standard') this.lowerQuality();
+    this.adaptPixelRatio(elapsed, delta, now);
     if (this.transitionRemaining > 0) {
       this.applyAppearance(Math.min(delta / this.transitionRemaining, 1));
       this.transitionRemaining = Math.max(0, this.transitionRemaining - delta);
@@ -378,9 +389,40 @@ export class Studio {
     if (moving) this.frame = requestAnimationFrame(this.animate);
   };
 
+  private maxPixelRatio() {
+    return Math.min(window.devicePixelRatio, this.quality.dpr, this.pixelRatioCeiling);
+  }
+
+  private setPixelRatio(ratio: number) {
+    this.pixelRatio = ratio;
+    this.renderer.setPixelRatio(ratio);
+  }
+
+  /** Trade resolution in small steps before effects, and win it back once frames settle. */
+  private adaptPixelRatio(elapsed: number, delta: number, now: number) {
+    // Count real stall time (bounded), so very slow devices react sooner, not later.
+    this.slowFrames = elapsed > 0.025 ? this.slowFrames + Math.min(elapsed, 0.1) : Math.max(0, this.slowFrames - delta);
+    this.fastFrames = elapsed < 0.02 ? this.fastFrames + elapsed : 0;
+    if (this.slowFrames > 1.5 && this.pixelRatio > MIN_PIXEL_RATIO) {
+      // Stalling right after a recovery means this device cannot hold that ratio.
+      if (now - this.lastRatioRaise < 4000) this.pixelRatioCeiling = this.pixelRatio - PIXEL_RATIO_STEP;
+      this.setPixelRatio(Math.max(MIN_PIXEL_RATIO, this.pixelRatio - PIXEL_RATIO_STEP));
+      this.slowFrames = this.fastFrames = 0;
+      this.resize();
+    } else if (this.slowFrames > 3 && this.quality.level === 'standard') {
+      this.lowerQuality();
+    } else if (this.fastFrames > 4 && this.pixelRatio < this.maxPixelRatio()) {
+      this.setPixelRatio(Math.min(this.maxPixelRatio(), this.pixelRatio + PIXEL_RATIO_STEP));
+      this.lastRatioRaise = now;
+      this.slowFrames = this.fastFrames = 0;
+      this.resize();
+    }
+  }
+
   private lowerQuality() {
     this.quality = LOW_QUALITY;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.dpr));
+    this.slowFrames = this.fastFrames = 0;
+    this.setPixelRatio(Math.min(this.pixelRatio, this.maxPixelRatio()));
     this.renderer.transmissionResolutionScale = this.quality.transmissionScale;
     this.keyLight.shadow.mapSize.set(this.quality.shadowSize, this.quality.shadowSize);
     this.keyLight.shadow.map?.dispose();
@@ -408,7 +450,7 @@ export class Studio {
       projected.expandByPoint(new THREE.Vector3(x, y, z).applyMatrix4(this.model.group.matrixWorld).project(this.camera));
     }
     return {
-      theme: this.theme.id, quality: this.quality.level, frames: this.renderedFrames,
+      theme: this.theme.id, quality: this.quality.level, pixelRatio: this.pixelRatio, frames: this.renderedFrames,
       frameP95: times[Math.floor(times.length * 0.95)] ?? 0,
       memory: { ...this.renderer.info.memory }, programs: this.renderer.info.programs?.length ?? 0,
       drawCalls: this.renderer.info.render.calls, input: this.input.getSnapshot(),

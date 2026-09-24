@@ -7,7 +7,7 @@ import { ChallengeSession } from './ChallengeSession';
 import { CompositionGate } from './CompositionGate';
 import { characters } from './scoring';
 import { Records } from './Records';
-import type { PassageChoice } from './types';
+import { DURATION_MS, type PassageChoice } from './types';
 import './challenge.css';
 
 export interface ChallengeHandle { virtualKey(code: string): void }
@@ -59,9 +59,10 @@ const Challenge = forwardRef<ChallengeHandle, Props>(function Challenge({ input,
   useLayoutEffect(() => {
     const node = prompt.current, current = node?.querySelector<HTMLElement>('[data-current="true"]');
     if (!node || !current) return;
-    const outer = node.getBoundingClientRect(), inner = current.getBoundingClientRect();
-    if (inner.bottom > outer.bottom - 8) node.scrollTop += inner.bottom - outer.bottom + 12;
-    else if (inner.top < outer.top) node.scrollTop += inner.top - outer.top;
+    // Snap to whole lines so no row is ever half clipped; the current line leads.
+    const line = parseFloat(getComputedStyle(node).lineHeight);
+    const top = Math.floor((current.offsetTop + line / 2) / line) * line;
+    if (Math.abs(node.scrollTop - top) > 1) node.scrollTop = top;
   }, [race.correct, offset]);
   const commit = (next: string) => { session.commit(next); setValue(session.getSnapshot().race.text); setHint(''); };
   const begin = () => {
@@ -78,26 +79,36 @@ const Challenge = forwardRef<ChallengeHandle, Props>(function Challenge({ input,
   } }));
   const measured = race.uniqueCorrect + race.errors > 0;
   const result = state.last?.result ?? race;
+  const progress = race.phase === 'running' ? race.remainingMs / DURATION_MS : race.phase === 'countdown' ? 1 : 0;
+  const urgent = race.phase === 'running' && race.remainingMs <= 5000;
   return <section className={`challenge challenge--${race.phase}`} aria-label="Typing challenge" data-phase={race.phase}>
-    <div className="challenge-setup" data-keyboard-controls>
-      <div className="challenge-identity">
-        {state.player ? <span className="player-name">{state.player.nickname}</span> : <label><span className="sr-only">닉네임</span><input aria-label="닉네임" placeholder="닉네임" value={nickname} maxLength={20} disabled={locked || state.initializing} onChange={event => setNickname(event.target.value)} autoComplete="off" /></label>}
-        <label><span className="sr-only">지문 언어</span><select aria-label="지문 언어" value={state.choice} disabled={locked || state.saving} onChange={event => { session.configure(event.target.value as PassageChoice); setValue(''); gate.current.reset(); setHint(''); }}><option value="korean">한국어</option><option value="english">English</option></select></label>
+    <aside className="challenge-side" aria-label="Challenge controls">
+      <div className="challenge-setup" data-keyboard-controls>
+        <div className="challenge-identity">
+          {state.player ? <span className="player-name">{state.player.nickname}</span> : <label><span className="sr-only">닉네임</span><input aria-label="닉네임" placeholder="닉네임" value={nickname} maxLength={20} disabled={locked || state.initializing} onChange={event => setNickname(event.target.value)} autoComplete="off" /></label>}
+          <label><span className="sr-only">지문 언어</span><select aria-label="지문 언어" value={state.choice} disabled={locked || state.saving} onChange={event => { session.configure(event.target.value as PassageChoice); setValue(''); gate.current.reset(); setHint(''); }}><option value="korean">한국어</option><option value="english">English</option></select></label>
+        </div>
+        {locked ? <button type="button" className="race-cancel" onClick={() => { session.cancel(); input.releaseAll(); }}>취소</button> : <button type="button" className="race-start" disabled={!themeReady || state.initializing || state.saving || (!state.player && !nickname.trim())} onClick={begin}>{finished || race.phase === 'canceled' ? '다시 시작' : '시작'}</button>}
       </div>
-      {locked ? <button type="button" className="race-cancel" onClick={() => { session.cancel(); input.releaseAll(); }}>취소</button> : <button type="button" className="race-start" disabled={!themeReady || state.initializing || state.saving || (!state.player && !nickname.trim())} onClick={begin}>{finished || race.phase === 'canceled' ? '다시 시작' : '시작'}</button>}
-    </div>
-    {!state.player && !locked ? <p className="nickname-note">닉네임과 최고 기록은 공개</p> : null}
-    {locked || finished ? <div className="race-metrics" aria-label={finished ? 'Final result' : 'Current performance'}>
-      {!finished ? <div><span>{race.phase === 'countdown' ? '시작까지' : '남은 시간'}</span><output data-testid="race-time">{state.starting ? '—' : race.phase === 'countdown' ? race.countdown : `${Math.ceil(race.remainingMs / 1000)}초`}</output></div> : null}
-      <div><span>글자/초</span><output data-testid="race-speed">{result.speed.toFixed(2)}</output></div>
-      <div><span>정확도</span><output data-testid="race-accuracy">{measured ? `${result.accuracy.toFixed(1)}%` : '—'}</output></div>
-    </div> : null}
-    {locked ? <>
-      <div ref={prompt} className="race-passage" aria-label={`지문: ${shown.join('')}`}><span aria-hidden="true">{shown.map((character, index) => {
-        const position = offset + index, current = position === race.correct;
+      {!locked && !finished ? <p className="challenge-intro">30초 동안 지문을 그대로 따라 입력합니다. 맞게 입력한 글자로 속도를 재요.{!state.player ? <span className="nickname-note">닉네임과 최고 기록은 순위표에 공개됩니다.</span> : null}</p> : null}
+      {locked || finished ? <div className={`race-metrics${finished ? ' race-metrics--final' : ''}${urgent ? ' race-metrics--urgent' : ''}`} aria-label={finished ? 'Final result' : 'Current performance'}>
+        {!finished ? <div className="metric-time"><span>{race.phase === 'countdown' ? '시작까지' : '남은 시간'}</span><output data-testid="race-time">{state.starting ? '—' : race.phase === 'countdown' ? race.countdown : `${Math.ceil(race.remainingMs / 1000)}초`}</output></div> : null}
+        <div className="metric-speed"><span>글자/초</span><output data-testid="race-speed">{result.speed.toFixed(2)}</output></div>
+        <div><span>정확도</span><output data-testid="race-accuracy">{measured ? `${result.accuracy.toFixed(1)}%` : '—'}</output></div>
+        {finished ? <div className="metric-detail"><span>정확 입력 {result.uniqueCorrect}자 · 오타 {result.errors}</span></div> : null}
+      </div> : null}
+      {finished ? <div className="race-save" role="status" data-state={state.saving ? 'saving' : state.saved ? 'saved' : 'unsaved'}>{state.saving ? '저장 중…' : state.saved ? '저장 완료' : '저장되지 않음'}</div> : null}
+      {state.error ? <div className="storage-error" role="alert" data-keyboard-controls>{state.error}{finished && !state.saved ? <button type="button" disabled={state.saving} onClick={() => void session.retrySave()}>저장 재시도</button> : null}</div> : null}
+      {!locked && enabled ? <Records key={state.choice} choice={state.choice} revision={state.revision} playerId={state.player?.id} onDeleted={onDeleted} /> : null}
+    </aside>
+    <div className="challenge-main">
+      <div className="race-progress" aria-hidden="true" data-active={locked}><span style={{ transform: `scaleX(${progress})` }} /></div>
+      <div ref={prompt} className="race-passage" data-phase={race.phase} aria-label={`지문: ${shown.join('')}`}><span aria-hidden="true">{shown.map((character, index) => {
+        const position = offset + index, current = locked && position === race.correct;
         return <span key={position} data-current={current} className={position < race.correct ? 'prompt-correct' : current ? race.text.length > race.correct && !gate.current.composing ? 'prompt-current prompt-error' : 'prompt-current' : ''}>{character === ' ' && current ? '␣' : character}</span>;
       })}</span></div>
-      <textarea id="challenge-input" data-keyboard-input ref={editor} value={value} readOnly={race.phase !== 'running'} aria-label="Challenge typing input" aria-describedby="challenge-hint" placeholder={race.phase === 'running' ? '위 지문을 입력' : state.starting ? '연결 중…' : race.phase === 'countdown' ? '준비' : '30초 타이핑'} rows={1} spellCheck={false} autoCapitalize="off" autoComplete="off" autoCorrect="off"
+      {locked ? <>
+      <textarea id="challenge-input" data-keyboard-input ref={editor} value={value} readOnly={race.phase !== 'running'} wrap="off" aria-label="Challenge typing input" aria-describedby="challenge-hint" placeholder={race.phase === 'running' ? '위 지문을 입력' : state.starting ? '연결 중…' : race.phase === 'countdown' ? `${race.countdown}초 뒤 시작` : '30초 타이핑'} rows={1} spellCheck={false} autoCapitalize="off" autoComplete="off" autoCorrect="off"
         onInput={event => {
           const native = event.nativeEvent as InputEvent;
           if (blockedInput(native.inputType ?? '')) { event.currentTarget.value = race.text; setValue(race.text); setHint('직접 입력해 주세요.'); return; }
@@ -113,9 +124,8 @@ const Challenge = forwardRef<ChallengeHandle, Props>(function Challenge({ input,
         onDrop={event => { event.preventDefault(); setHint('직접 입력해 주세요.'); }}
       />
       <div className="challenge-note" id="challenge-hint" role="status">{race.phase === 'canceled' ? race.reason : hint || (race.text.length > characters(race.text).slice(0, race.correct).join('').length && !gate.current.composing ? '오타를 수정해 주세요.' : '')}</div>
-    </> : finished ? <div className="race-save" role="status">{state.saving ? '저장 중…' : state.saved ? '저장 완료' : '저장되지 않음'}</div> : race.phase === 'canceled' ? <p className="challenge-note" role="status">{race.reason}</p> : null}
-    {state.error ? <div className="storage-error" role="alert" data-keyboard-controls>{state.error}{finished && !state.saved ? <button type="button" disabled={state.saving} onClick={() => void session.retrySave()}>저장 재시도</button> : null}</div> : null}
-    {!locked && enabled ? <Records key={state.choice} choice={state.choice} revision={state.revision} playerId={state.player?.id} onDeleted={onDeleted} /> : null}
+      </> : race.phase === 'canceled' ? <p className="challenge-note" role="status">{race.reason}</p> : !finished ? <p className="challenge-cta">시작을 누르면 3초 뒤에 이 지문으로 시작합니다.</p> : null}
+    </div>
   </section>;
 });
 export default Challenge;

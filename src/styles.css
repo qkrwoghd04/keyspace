@@ -167,3 +167,11 @@ textarea::placeholder { color: color-mix(in srgb, var(--ink) 72%, var(--paper));
 @media (max-width: 540px) { .keyspace[data-mode="challenge"] .main-room { grid-template-rows: 72px minmax(min-content, 1fr) 112px; } }
 .keyspace[data-mode="challenge"] .collection-item:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+/* Challenge on desktop: typing and keyboard on the left, every control in a right-hand panel. */
+@media (min-width: 1024px) {
+  .keyspace[data-mode="challenge"] .main-room { min-height: 640px; }
+  .playground.playground--challenge { grid-template-columns: minmax(0, 1fr) clamp(260px, 22vw, 320px); column-gap: clamp(24px, 3vw, 48px); margin-inline: clamp(24px, 3.5vw, 64px); }
+  .playground--challenge .mode-switch, .playground--challenge .challenge-loading { grid-column: 1; }
+  .playground--challenge .challenge-slot { display: contents; }
+  .playground--challenge .keyboard-stage { grid-column: 1; grid-row: 3; }
+}

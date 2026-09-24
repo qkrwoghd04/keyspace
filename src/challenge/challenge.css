@@ -9,22 +9,42 @@
 .challenge-identity select { min-height: 44px; max-width: 100%; padding-right: 12px; background: transparent; border: 0; }
 .challenge-identity select option { background: var(--paper); }
 .player-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nickname-note { font-size: 10px; margin: 2px 0 8px; color: var(--muted); }
-.race-start, .race-cancel { flex-shrink: 0; min-height: 44px; min-width: 72px; padding: 0 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--control-active); }
-.race-cancel { background: none; }
-.race-metrics { display: flex; gap: clamp(22px, 4vw, 48px); align-items: baseline; padding: 14px 0; border-top: 1px solid var(--line); margin-top: 8px; font-variant-numeric: tabular-nums; }
+.challenge-intro { margin: 4px 0 12px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.nickname-note { display: block; font-size: 10px; color: var(--subtle); }
+.race-start, .race-cancel { flex-shrink: 0; min-height: 44px; min-width: 88px; padding: 0 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--control-active); transition: background-color 160ms, border-color 160ms, color 160ms; }
+.race-start:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 500; }
+.race-start:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 86%, var(--ink)); }
+.race-cancel { background: none; color: var(--muted); }
+.race-cancel:hover { color: var(--ink); border-color: var(--muted); }
+/* Remaining time as a hairline that drains from right to left. */
+.race-progress { height: 2px; margin-top: 8px; background: var(--line); overflow: hidden; }
+.race-progress span { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 60ms linear; }
+.race-metrics { display: flex; gap: clamp(22px, 4vw, 48px); align-items: baseline; padding: 14px 0; margin-top: 0; font-variant-numeric: tabular-nums; }
 .race-metrics > div { display: flex; align-items: baseline; gap: 9px; }
-.race-metrics span { font-size: 10px; color: var(--muted); }
+.race-metrics span { font-size: 11px; letter-spacing: .02em; color: var(--muted); }
 .race-metrics output { font-size: 22px; letter-spacing: -.03em; }
-.challenge--countdown .race-metrics > div:first-child output { color: var(--accent); }
-.race-passage { height: 3.4em; max-height: 3.4em; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; font-size: 23px; line-height: 1.7; letter-spacing: -.025em; white-space: pre-wrap; word-break: break-word; color: color-mix(in srgb, var(--ink) 68%, var(--paper)); }
-.prompt-correct { color: var(--accent); }
-.prompt-current { background: var(--selection); color: var(--ink); border-bottom: 2px solid var(--accent); }
-.prompt-error { background: color-mix(in srgb, #b84435 22%, var(--paper)); border-color: #b84435; text-decoration: underline wavy #b84435; }
-#challenge-input { margin-top: 9px; padding: 9px 0; height: 43px; font-family: inherit; font-size: 16px; line-height: 1.4; letter-spacing: -.015em; text-align: left; border-bottom: 1px solid var(--line); }
-#challenge-input:focus { border-color: var(--accent); }
+.metric-time output { min-width: 2.6em; }
+.challenge--countdown .metric-time output, .race-metrics--urgent .metric-time output { color: var(--accent); }
+.race-metrics--final { flex-wrap: wrap; row-gap: 6px; padding: 18px 0 10px; border-top: 1px solid var(--line); margin-top: 8px; }
+.race-metrics--final output { font-size: 30px; }
+.race-metrics--final .metric-speed output { font-size: 44px; line-height: 1; color: var(--accent); }
+.race-metrics--final .metric-detail { flex-basis: 100%; }
+.race-passage { position: relative; height: 3.4em; max-height: 3.4em; overflow: hidden; font-size: 23px; line-height: 1.7; letter-spacing: -.025em; white-space: pre-wrap; word-break: break-word; color: color-mix(in srgb, var(--ink) 45%, var(--paper)); transition: opacity 200ms; }
+.race-passage[data-phase="countdown"] { opacity: .55; }
+.prompt-correct { color: var(--ink); }
+.prompt-current { color: var(--ink); box-shadow: inset 0 -2px var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 2px; }
+.prompt-error { background: color-mix(in srgb, #b84435 18%, var(--paper)); box-shadow: inset 0 -2px #b84435; color: #9c3326; }
+#challenge-input { margin-top: 12px; padding: 10px 0; height: 44px; overflow: hidden; font-family: inherit; font-size: 16px; line-height: 1.5; letter-spacing: -.015em; text-align: left; color: var(--muted); border-bottom: 1px solid var(--line); transition: border-color 160ms; }
+#challenge-input:focus { border-color: var(--accent); color: var(--ink); }
 .challenge-note { margin-top: 6px; min-height: 16px; font-size: 11px; color: var(--muted); line-height: 1.5; }
-.race-save { min-height: 30px; font-size: 12px; color: var(--muted); }
+.challenge-note:not(:empty) { color: #b84435; }
+.challenge--canceled .challenge-note { color: var(--muted); }
+.race-save { display: flex; align-items: center; gap: 7px; min-height: 30px; font-size: 11px; color: var(--muted); }
+.race-save::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.race-save[data-state="saved"]::before { background: #5f8a5a; }
+.race-save[data-state="saving"]::before { background: var(--accent); animation: race-save-pulse 900ms ease-in-out infinite alternate; }
+@keyframes race-save-pulse { to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .race-progress span, .race-passage { transition: none; } .race-save[data-state="saving"]::before { animation: none; } }
 .storage-error { font-size: 12px; line-height: 1.6; padding-bottom: 8px; }
 .challenge-records { margin-top: 8px; border-top: 1px solid var(--line); font-size: 12px; }
 .records-tabs { display: flex; gap: 24px; }
@@ -39,8 +59,14 @@
 .challenge-records table:has(th:nth-child(4)) th:first-child { width: 40px; }
 .challenge-records table:has(th:nth-child(4)) td:nth-child(2), .challenge-records table:has(th:nth-child(4)) th:nth-child(2) { text-align: left; width: 40%; }
 .record--mine { color: var(--accent); }
+.record--mine td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.record-rank { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: 50%; }
+.record-rank[data-podium] { font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.record--mine .record-rank[data-podium] { color: var(--accent); }
 .record-you { margin-left: 7px; font-size: 9px; }
 .records-message { margin: 0; min-height: 44px; padding-block: 14px; font-size: 11px; color: var(--muted); }
+.records-empty { display: flex; flex-direction: column; gap: 4px; padding-block: 20px; }
+.records-empty span:first-child { color: var(--ink); font-size: 12px; }
 .records-pages { display: flex; align-items: center; justify-content: flex-end; gap: 20px; font-size: 11px; }
 .records-delete { color: var(--muted) !important; font-size: 10px !important; }
 .delete-confirm { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 11px; }
@@ -52,7 +78,38 @@
   .player-name { max-width: 100px; }
   .race-metrics { justify-content: space-between; gap: 12px; }
   .race-metrics > div { flex-direction: column; gap: 5px; }
+  .race-metrics--final { justify-content: flex-start; column-gap: 32px; }
+  .race-metrics--final .metric-detail { flex-direction: row; }
   .race-passage { font-size: 19px; }
   .challenge-records table { font-size: 10px; }
 }
 @media (max-width: 350px) { .challenge-identity input { width: 75px; } .player-name { max-width: 75px; } .challenge-setup { gap: 6px; } }
+.challenge-cta { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.race-progress[data-active="false"] { visibility: hidden; }
+.race-passage[data-phase="ready"], .race-passage[data-phase="canceled"] { opacity: .55; }
+@media (min-width: 1024px) {
+  .challenge { display: contents; }
+  .challenge-main { grid-column: 1; grid-row: 2; width: min(880px, 100%); justify-self: center; padding-top: 4px; }
+  .challenge-main .race-passage { font-size: 26px; }
+  /* Zero intrinsic height: the panel fills its grid area and scrolls instead of stretching the rows. */
+  .challenge-side { grid-column: 2; grid-row: 1 / -1; height: 0; min-height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; display: flex; flex-direction: column; padding: 10px 0 20px clamp(20px, 2vw, 30px); border-left: 1px solid var(--line); }
+  .challenge-side .challenge-setup { flex-direction: column; align-items: stretch; gap: 10px; }
+  .challenge-side .challenge-identity { flex-direction: column; align-items: stretch; gap: 0; }
+  .challenge-side .challenge-identity label, .challenge-side .challenge-identity input, .challenge-side .challenge-identity select { width: 100%; }
+  .challenge-side .player-name { max-width: none; min-height: 44px; display: flex; align-items: center; font-size: 13px; }
+  .challenge-side .race-start, .challenge-side .race-cancel { width: 100%; }
+  .challenge-side .challenge-intro { margin: 14px 0 6px; }
+  .challenge-side .race-metrics { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0; margin-top: 14px; padding: 4px 0; border-top: 1px solid var(--line); }
+  .challenge-side .race-metrics > div { justify-content: space-between; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .challenge-side .race-metrics output { font-size: 26px; }
+  .challenge-side .race-metrics--final .metric-speed { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .challenge-side .race-metrics--final .metric-speed output { font-size: 52px; }
+  .challenge-side .race-metrics--final .metric-detail { border-bottom: 0; padding-top: 8px; }
+  .challenge-side .race-save { margin-top: 4px; }
+  .challenge-side .challenge-records { margin-top: 18px; }
+  .challenge-side .records-scroll { max-height: none; }
+  .challenge-side .challenge-records table { font-size: 11px; }
+}
+@media (max-width: 1023px) {
+  .challenge:not(.challenge--countdown):not(.challenge--running) :is(.race-progress, .race-passage, .challenge-cta) { display: none; }
+}

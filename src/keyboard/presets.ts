@@ -66,7 +66,7 @@ export const PRESETS: readonly KeyboardPreset[] = [
       key: { color: '#e4edff', intensity: 1.5, position: [-5, 9, 6] },
       fill: { color: '#83a7e7', intensity: 0.7, position: [8, 5, -7] },
       rim: { color: '#b7d6ff', intensity: 1.7, position: [-3, 5, -9] },
-      exposure: 0.95,
+      exposure: 1.08,
     },
     housing: {
       body: { color: '#171d27', roughness: 0.46, metalness: 0.62 },
@@ -114,7 +114,7 @@ export const PRESETS: readonly KeyboardPreset[] = [
       key: { color: '#f4e9ff', intensity: 1.8, position: [-5, 10, 6] },
       fill: { color: '#85edd6', intensity: 1.25, position: [8, 5, -7] },
       rim: { color: '#f58bc9', intensity: 2.4, position: [-6, 6, -7] },
-      exposure: 1.05,
+      exposure: 1.15,
     },
     housing: {
       body: { color: '#3e2e50', roughness: 0.35, metalness: 0.62, clearcoat: 0.38 },

@@ -25,6 +25,8 @@ async function finish(page: Page, saved = true) {
 }
 async function select(page: Page, id: string) {
   if (page.viewportSize()!.width < 1024) await page.locator('.mobile-collection-open').click();
+  // Challenge collapses the desktop collection to give the keyboard room.
+  else if (await page.getByRole('button', { name: 'Open collection' }).isVisible()) await page.getByRole('button', { name: 'Open collection' }).click();
   await page.locator('.collection-item[data-theme="' + id + '"]:visible').click();
   await expect(page.locator('.keyspace')).toHaveAttribute('data-preset', id);
 }
@@ -212,9 +214,13 @@ test('Challenge fits desktop, tablet, portrait, landscape and 320px layouts', as
     await start(page); await page.keyboard.type('A'); await finish(page);
     await page.getByRole('tab', { name: '내 기록' }).click();
     const bounds = await page.evaluate(() => {
-      const main = document.querySelector('.challenge')!.getBoundingClientRect(), canvas = document.querySelector('canvas')!.getBoundingClientRect(), footer = document.querySelector('.site-footer')!.getBoundingClientRect();
-      return { mainBottom: main.bottom, canvasTop: canvas.top, canvasBottom: canvas.bottom, footerTop: footer.top, overflow: document.documentElement.scrollWidth > innerWidth };
+      const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+      const main = rect('.challenge-main'), side = rect('.challenge-side'), canvas = rect('canvas'), footer = rect('.site-footer');
+      return { mainBottom: main.bottom, sideLeft: side.left, sideBottom: side.bottom, canvasTop: canvas.top, canvasRight: canvas.right, canvasBottom: canvas.bottom, footerTop: footer.top, overflow: document.documentElement.scrollWidth > innerWidth };
     });
     expect(bounds.overflow).toBe(false); expect(bounds.canvasTop).toBeGreaterThanOrEqual(bounds.mainBottom - 2); expect(bounds.footerTop).toBeGreaterThanOrEqual(bounds.canvasBottom - 2);
+    // Desktop keeps controls in a side panel beside the keyboard; narrower layouts stack them above it.
+    if (width >= 1024) expect(bounds.canvasRight).toBeLessThanOrEqual(bounds.sideLeft + 2);
+    else expect(bounds.canvasTop).toBeGreaterThanOrEqual(bounds.sideBottom - 2);
   }
 });

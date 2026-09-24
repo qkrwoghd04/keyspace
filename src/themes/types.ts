@@ -18,10 +18,10 @@ export interface QualitySettings {
 }
 
 export const STANDARD_QUALITY: QualitySettings = {
-  level: 'standard', dpr: 2, shadowSize: 2048, transmissionScale: 0.5, particles: 128, flames: 48, waves: 12,
+  level: 'standard', dpr: 2, shadowSize: 2048, transmissionScale: 0.75, particles: 128, flames: 48, waves: 12,
 };
 export const LOW_QUALITY: QualitySettings = {
-  level: 'low', dpr: 1.25, shadowSize: 1024, transmissionScale: 0.35, particles: 48, flames: 20, waves: 4,
+  level: 'low', dpr: 1.75, shadowSize: 1024, transmissionScale: 0.5, particles: 48, flames: 20, waves: 4,
 };
 
 export interface ThemeContext {
